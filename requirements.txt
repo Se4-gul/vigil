@@ -1,0 +1,12 @@
+numpy
+pandas
+xarray
+h5netcdf
+fsspec
+aiohttp
+requests
+rasterio
+geopandas
+scikit-learn
+matplotlib
+jupyter
