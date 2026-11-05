@@ -132,13 +132,15 @@ Download scripts are in `src/vigil/data/`; settings are in `src/vigil/config.py`
 ## Website design notes
 From Rishi's feedback on the first East Gippsland animation (2026-11-05):
 - **Smooth, not jumpy:** animate between days (new burn fades in or grows outward), no hard frame-to-frame jumps.
-- **Dark basemap:** a dark, muted basemap (e.g. dark hillshade), not white.
-- **Softer fire colours:** a warm, restrained palette. Soft amber for new burn; older burn fades to muted, desaturated embers. Avoid pure saturated reds and harsh dark-red/orange.
-- **Minimal:** clean typography, a date ticker, a scale bar, maybe a wind arrow. Nothing else unless it earns its place.
-- The current `docs/figures/` animation and map (`src/vigil/viz.py`) predate these notes; they're quick-look outputs, not the website style.
+- **Dark basemap:** a dark, muted basemap that's free, needs no API key, and carries proper attribution.
+- **Softer fire colours:** a warm, restrained palette. Soft amber for new burn; older burn fades to muted, desaturated embers. No saturated reds.
+- **Minimal UI:** clean typography, a date ticker, play/pause and a day slider, a scale bar, a fire picker. Maybe a wind arrow later. Nothing else unless it earns its place.
+- **Start view:** East Gippsland 2019–20.
+- **Tech:** static site in `app/` (MapLibre GL JS), no backend, so it can be hosted free. Light data: burn day per cell as one image per fire, animated in the browser. v0 = replay of real 2020 fires from our labels; model predictions get added later.
+- v0 built (2026-11-05): `app/` (index.html, style.css, app.js) + `app/data/` from `python -m vigil.web_export` (11 fires of 2019–20, one Web Mercator PNG each, 0.1 MB total). Basemap: OpenFreeMap "dark" vector style (free, no key; OpenStreetMap/OpenMapTiles attribution shown). CARTO's dark tiles now need an API key, so they were dropped. Fire drawn on a MapLibre canvas source under the place labels: cells ease in as soft amber on their burn day, then fade to muted embers over 6 days. Run locally: `cd app && python3 -m http.server 8765`. Screenshot: `docs/figures/app_v0_east_gippsland.png`.
+- The quick-look animation and map in `docs/figures/` (`src/vigil/viz.py`) predate these notes and aren't the website style.
 
 ## Open decisions
-- Website stack
 
 ## Todo
 - U-Net: run input ablations (e.g. without weather, without fuel, fire channels only). The random forest finding shows flexible models can learn season-specific fuel/weather shortcuts instead of spread, so check what the U-Net actually uses.

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vigil · fire replay</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="map"></div>
+
+  <section class="panel" aria-label="Fire replay">
+    <div class="brand">Vigil</div>
+    <div class="sub" id="season">Fire replay</div>
+    <label class="visually-hidden" for="fire">Fire</label>
+    <select id="fire"></select>
+    <div class="date" id="date">–</div>
+    <div class="stat" id="stat"></div>
+  </section>
+
+  <section class="controls" aria-label="Playback">
+    <button id="play" aria-label="Play">
+      <svg id="icon-play" viewBox="0 0 24 24" width="18" height="18"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>
+      <svg id="icon-pause" viewBox="0 0 24 24" width="18" height="18" hidden><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+    </button>
+    <input id="slider" type="range" min="0" max="1" step="0.01" value="0" aria-label="Day">
+    <div class="legend">
+      <span><i class="sw new"></i>Burning</span>
+      <span><i class="sw old"></i>Burnt earlier</span>
+    </div>
+  </section>
+
+  <div class="note">Burn day per 375 m cell from MODIS burned area + VIIRS active-fire timing.</div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
