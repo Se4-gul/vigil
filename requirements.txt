@@ -10,3 +10,11 @@ geopandas
 scikit-learn
 matplotlib
 jupyter
+h5py
+s3fs
+pyarrow
+scipy
+pyhdf
+earthaccess
+pyproj
+pytest
