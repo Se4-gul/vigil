@@ -118,7 +118,7 @@ function renderBars() {
   for (let i = 0; i < n; i++) {
     const v = fire.daily_kha[i], bh = Math.max(v > 0 ? 1.5 : 0, (v / max) * (base - 4));
     const age = t - i;
-    if (age <= 0) bctx.fillStyle = "rgba(217, 218, 214, 0.16)";
+    if (age <= 0) bctx.fillStyle = "rgba(146, 148, 150, 0.42)";   // future: dim ash, readable before play
     else {
       const li = lutAt(age);
       bctx.fillStyle = `rgba(${LUT[li]},${LUT[li + 1]},${LUT[li + 2]},${Math.max(LUT[li + 3] / 255, 0.55)})`;
@@ -189,7 +189,7 @@ async function loadFire(i, { animateView = true } = {}) {
                  paint: { "raster-resampling": "linear", "raster-fade-duration": 0 } }, firstLabelLayer);
   const lons = fire.corners.map(c => c[0]), lats = fire.corners.map(c => c[1]);
   map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-                { padding: { top: 190, bottom: 200, left: 60, right: 60 },
+                { padding: clearArea(),
                   duration: animateView && !params.has("day") && !REDUCED_MOTION ? 900 : 0 });
   $("fire-label").textContent = fire.label;
   $("fire-range").textContent = `${shortDate(dateOf(0))} to ${shortDate(dateOf(fire.days - 1))}, ` +
@@ -198,6 +198,19 @@ async function loadFire(i, { animateView = true } = {}) {
   $("slider").max = fire.days;
   t = 0;
   render();
+}
+
+// The clear part of the map: below the title block and above the date and
+// timeline, measured from the layout so the fire never sits under the text.
+function clearArea() {
+  const vh = innerHeight, vw = innerWidth, gap = 24;
+  const top = document.querySelector(".top").getBoundingClientRect().bottom + gap;
+  const bottom = vh - document.querySelector(".readout").getBoundingClientRect().top + gap;
+  const side = Math.min(80, vw * 0.06);
+  // Keep at least a third of the height for the fire on short screens.
+  const spare = vh - top - bottom;
+  const shrink = spare < vh / 3 ? (vh / 3 - spare) / 2 : 0;
+  return { top: Math.max(top - shrink, 10), bottom: Math.max(bottom - shrink, 10), left: side, right: side };
 }
 
 // Fire picker: the fire's name is the control; it opens a plain list.
@@ -228,7 +241,8 @@ async function init() {
   const data = await (await fetch("data/fires.json")).json();
   fires = data.fires;
   buildList();
-  await loadFire(0, { animateView: false });
+  const pick = params.has("fire") ? Math.max(0, fires.findIndex((f, i) => String(f.id) === params.get("fire") || String(i) === params.get("fire"))) : 0;
+  await loadFire(pick, { animateView: false });
   if (params.has("day")) { t = params.get("day") === "end" ? fire.days : +params.get("day"); render(); }
   requestAnimationFrame(frame);
   if (params.get("play") === "1") setPlaying(true);

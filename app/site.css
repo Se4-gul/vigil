@@ -49,7 +49,7 @@ a { color: inherit; }
 /* Text pages (About, placeholders): a quiet column on the land tone. */
 .page { min-height: 100vh; background: var(--land); }
 .page header { padding: 28px 32px 0; }
-.page main { max-width: 64ch; padding: 56px 32px 96px; }
+.page main { max-width: 64ch; margin: 0 auto; padding: 40px 32px 96px; }
 .page h1 { font: 400 46px/1.08 var(--serif); letter-spacing: -0.01em; margin: 0 0 18px; }
 .page h2 { font: 500 24px/1.2 var(--serif); margin: 44px 0 10px; }
 .page p, .page li { font: 400 18px/1.6 var(--serif); color: var(--ink); }
