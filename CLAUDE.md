@@ -118,6 +118,14 @@ Download scripts are in `src/vigil/data/`; settings are in `src/vigil/config.py`
   | Random forest (Huot-style) | 0.047 ± 0.023 | 0.024 | 0.124 | 0.071 | 0.029 |
   The distance baselines score 0 beyond 6 km. The random forest result is anomalous (far below logistic regression and persistence, the reverse of Huot et al.), so it isn't trusted until investigated; see Todo.
 
+## Website design notes
+From Rishi's feedback on the first East Gippsland animation (2026-11-05):
+- **Smooth, not jumpy:** animate between days (new burn fades in or grows outward), no hard frame-to-frame jumps.
+- **Dark basemap:** a dark, muted basemap (e.g. dark hillshade), not white.
+- **Softer fire colours:** a warm, restrained palette. Soft amber for new burn; older burn fades to muted, desaturated embers. Avoid pure saturated reds and harsh dark-red/orange.
+- **Minimal:** clean typography, a date ticker, a scale bar, maybe a wind arrow. Nothing else unless it earns its place.
+- The current `docs/figures/` animation and map (`src/vigil/viz.py`) predate these notes; they're quick-look outputs, not the website style.
+
 ## Open decisions
 - Website stack
 

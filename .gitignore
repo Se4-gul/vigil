@@ -10,3 +10,7 @@ __pycache__/
 *.tmp
 .env
 .netrc
+
+# Rendered animations (regenerate with python -m vigil.viz animate)
+docs/figures/*.mp4
+docs/figures/*.gif
