@@ -315,7 +315,7 @@ def example() -> None:
 
 
 # ---------------------------------------------------------------- season CV
-SCALES = [0.75, 1.0, 1.5, 2.0, 3.0]        # global ROS scale grid
+SCALES = [0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0]   # global ROS scale grid (first grid 0.75-3 hit its lower edge)
 T_BIN = 0.25                                # arrival-time bins, hours
 N_T = int(24 / T_BIN) + 1                   # last bin = not reached in 24 h
 _CTX = None
