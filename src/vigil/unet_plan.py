@@ -43,6 +43,8 @@ def log(msg):
 
 
 def append(row: dict):
+    """Rows have a fixed layout: the base fields, then held-out metrics if any
+    (see read_results)."""
     df = pd.DataFrame([row])
     df.to_csv(RESULTS, mode="a", header=not RESULTS.exists(), index=False)
 
@@ -105,9 +107,33 @@ def check_physics_encoding() -> str | None:
     return None
 
 
+HELDOUT_KEYS = ["heldout_F1", "heldout_IoU", "heldout_precision", "heldout_recall", "heldout_PR_AUC",
+                "heldout_F1 <=6 km", "heldout_recall <=6 km", "heldout_F1 6-24 km",
+                "heldout_recall 6-24 km", "heldout_F1 >24 km", "heldout_recall >24 km"]
+
+
+def read_results() -> pd.DataFrame:
+    """The results file mixes two row layouts: tuning rows (14 fields, the
+    header) and scored rows (the same 14 + 11 held-out metrics, no header of
+    their own). Parse both."""
+    import csv
+    rows = list(csv.reader(open(RESULTS)))
+    hdr, out = rows[0], []
+    for r in rows[1:]:
+        keys = hdr if len(r) == len(hdr) else hdr + HELDOUT_KEYS
+        out.append(dict(zip(keys, r)))
+    df = pd.DataFrame(out)
+    for c in df.columns:
+        try:
+            df[c] = pd.to_numeric(df[c])
+        except (ValueError, TypeError):
+            pass                                   # text columns (model, drop, ...)
+    return df
+
+
 def summary() -> pd.DataFrame:
-    r = pd.read_csv(RESULTS)
-    r = r[r.heldout_F1.notna()]
+    r = read_results()
+    r = r[r.get("heldout_F1").notna()] if "heldout_F1" in r else r.iloc[:0]
     cols = ["F1", "IoU", "precision", "recall", "PR_AUC", "F1 <=6 km", "F1 6-24 km", "F1 >24 km"]
     rows = []
     for model, g in r.groupby("model"):
@@ -187,4 +213,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:] == ["summary"]:
+        print(summary()[["model", "seeds", "F1", "F1 fold sd", "F1 seed sd", "PR_AUC"]].round(3).to_string(index=False))
+    else:
+        main()
