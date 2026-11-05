@@ -38,6 +38,7 @@ Equations:
 Usage:
   python -m vigil.physics example     # one fire-day: predicted vs actual figure
   python -m vigil.physics cv          # season CV, ROS scale tuned on the other folds
+  python -m vigil.physics channel     # arrival-time input channel (scale 1) for the hybrid U-Net
 """
 
 import heapq
@@ -433,10 +434,62 @@ def report_cv(P, N) -> None:
     print(summ.T.to_string())
 
 
+# ------------------------------------------------- physics input channel (hybrid)
+CHANNEL_SCALE = 1.0
+CHANNEL_PAD = 80          # half a window (64) + jitter (16), so windows can cut from it
+CHANNEL_DIR = PROCESSED / "physics_channel"
+UNREACHED = 255           # arrival stored in 0.1 h steps (0-240); 255 = not reached in 24 h
+
+
+def _channel_event(task):
+    season, event, days = task
+    ev, bd, _ = _CTX.season(season)
+    r, c = np.nonzero(ev == event)
+    r0, r1 = max(r.min() - CHANNEL_PAD, 0), min(r.max() + CHANNEL_PAD + 1, _CTX.H)
+    c0, c1 = max(c.min() - CHANNEL_PAD, 0), min(c.max() + CHANNEL_PAD + 1, _CTX.W)
+    out = []
+    for D in days:
+        arr = run(prepare(_CTX, season, event, D, r0, r1, c0, c1, start="active"), CHANNEL_SCALE)
+        q = np.where(np.isfinite(arr), np.minimum(np.round(arr * 10), 240), UNREACHED).astype(np.uint8)
+        out.append((season, event, D, r0, c0, q))
+    return out
+
+
+def precompute_channel(workers: int = 5) -> None:
+    """Physics arrival time (scale 1.0) for every fire-day with a window, CV and
+    test alike (no tuning happens on test, so computing it there is fine)."""
+    import time
+    from concurrent.futures import ProcessPoolExecutor
+    w = pd.read_parquet(PROCESSED / "windows.parquet")
+    wx_days = set((pd.to_datetime(xr.open_dataset(PROCESSED / "weather_daily.nc",
+                   engine="h5netcdf").day.values) - EPOCH).days)
+    fd = w.drop_duplicates(["season", "event", "day"])
+    fd = fd[fd.day.isin(wx_days) & (fd.day + 1).isin(wx_days)]
+    tasks = [(int(s), int(e), [int(d) for d in g.day]) for (s, e), g in fd.groupby(["season", "event"])]
+    tasks.sort(key=lambda t: -len(t[2]))
+    CHANNEL_DIR.mkdir(parents=True, exist_ok=True)
+    store, t0, done = {}, time.time(), 0
+    with ProcessPoolExecutor(workers, initializer=_init_worker) as pool:
+        for res in pool.map(_channel_event, tasks):
+            for season, event, D, r0, c0, q in res:
+                store.setdefault(season, {})[f"{event}_{D}"] = q
+                store[season][f"{event}_{D}_origin"] = np.array([r0, c0])
+                done += 1
+            if done and done % 100 < len(res):
+                print(f"  {done}/{len(fd)} fire-days, {(time.time() - t0) / 60:.0f} min", flush=True)
+    for season, d in store.items():
+        out = CHANNEL_DIR / f"{season}.npz"
+        tmp = out.with_name(out.stem + ".tmp.npz")
+        np.savez_compressed(tmp, **d)
+        tmp.rename(out)
+    print(f"{done} fire-days -> {CHANNEL_DIR}")
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("cmd", choices=["example", "cv"])
+    parser.add_argument("cmd", choices=["example", "cv", "channel"])
     parser.add_argument("--workers", type=int, default=5)
     a = parser.parse_args()
-    example() if a.cmd == "example" else cv(a.workers)
+    {"example": example, "cv": lambda: cv(a.workers),
+     "channel": lambda: precompute_channel(a.workers)}[a.cmd]()

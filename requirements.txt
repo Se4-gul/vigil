@@ -18,3 +18,4 @@ pyhdf
 earthaccess
 pyproj
 pytest
+torch
