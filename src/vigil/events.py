@@ -83,6 +83,13 @@ MANUAL_EXCLUDE = [
             "outline. Autumn burn-offs chained by the 5 km / 14 d linking, not one bushfire. "
             "Its largest burst holds 52%, just above the stop-start rule's 50%."},
 ]
+# Fragments: small pieces of a DEECA fire that the 5 km / 14 d linking left
+# separate (e.g. 8 detections 5.1 km from the Upper Murray fire). Absorbed into
+# the larger event that shares their majority DEECA fire key and their
+# MCD64A1 patch. Large co-keyed events stay separate (separate ignitions in
+# one DEECA complex, e.g. W20141735).
+FRAGMENT_MAX_DAYS = 3          # fragment: fewer active fire days than this ...
+FRAGMENT_MAX_DETECTIONS = 50   # ... or fewer detections than this
 LATE_DAYS = 30                 # pieces this long after/before the main event are later burns, not splits
 
 
@@ -295,6 +302,79 @@ def tune(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def absorb_fragments(d: pd.DataFrame, fday: np.ndarray) -> pd.Series:
+    """Merge fragment events into their host (in place on d.event); returns the
+    original event id for absorbed detections (-1 otherwise).
+
+    Fragment: a modelling event with < FRAGMENT_MAX_DAYS active fire days or
+    < FRAGMENT_MAX_DETECTIONS detections. Host: a non-fragment modelling event
+    of the same season with the same majority DEECA fire key, holding
+    detections in the MCD64A1 patch that has most of the fragment's detections
+    (at least half of them), and with all of the fragment's detections within
+    LATE_DAYS of the host's main activity (the split_late rule: later burns
+    inside an old fire's outline stay separate). Same season, so never across
+    a fold boundary."""
+    from scipy import ndimage
+    from vigil.burn_history import grid
+    from vigil.labels import TOUCH_CELLS, mcd_season, patches
+    transform, h, w = grid()
+    col, row = ~transform * (d.x.values, d.y.values)
+    row, col = np.floor(row).astype(int), np.floor(col).astype(int)
+    inside = (row >= 0) & (row < h) & (col >= 0) & (col < w)
+    m = d.exclude_reason.isna().values
+    g = d[m].groupby("event")
+    n = g.size()
+    days = pd.Series(fday[m]).groupby(d.event.values[m]).nunique()
+    season = g.season.first()
+    key = d[m].dropna(subset=["deeca_firekey"]).groupby("event").deeca_firekey.agg(
+        lambda s: s.value_counts().index[0])
+    frag = (days < FRAGMENT_MAX_DAYS) | (n < FRAGMENT_MAX_DETECTIONS)
+    t = pd.Series((d.time - pd.Timestamp("2000-01-01")).dt.total_seconds().values[m] / 86400)
+    span = t.groupby(d.event.values[m]).quantile([0.025, 0.975]).unstack()
+    t_range = t.groupby(d.event.values[m]).agg(["min", "max"])
+    fold_of = {s_: f for f, ss in CV_FOLDS.items() for s_ in ss} | {s_: "test" for s_ in TEST_SEASONS}
+    mapping, stats, patch_of = {}, [], {}
+    for (s_, k), evs in key.groupby([season.reindex(key.index), key]):
+        evs = evs.index
+        frags, hosts = evs[frag[evs].values], evs[~frag[evs].values]
+        if not len(frags) or not len(hosts):
+            continue
+        if s_ not in patch_of:        # one season at a time (groups are sorted by season)
+            p = patches(mcd_season(int(s_)) > 0)
+            near = ndimage.grey_dilation(p, size=(2 * TOUCH_CELLS + 1,) * 2)
+            patch_of = {s_: np.where(p > 0, p, near)}
+        pm = patch_of[s_]
+        pid = np.zeros(len(d), np.int64)
+        sel = np.isin(d.event.values, evs) & inside
+        pid[sel] = pm[row[sel], col[sel]]
+        for f_ in frags:
+            fp = pid[d.event.values == f_]
+            fp = fp[fp > 0]
+            if not len(fp):
+                continue
+            main_patch = np.bincount(fp).argmax()
+            if (fp == main_patch).sum() < 0.5 * (d.event.values == f_).sum():
+                continue
+            in_patch = {hh: int(((d.event.values == hh) & (pid == main_patch)).sum()) for hh in hosts
+                        if t_range.loc[f_, "min"] >= span.loc[hh, 0.025] - LATE_DAYS
+                        and t_range.loc[f_, "max"] <= span.loc[hh, 0.975] + LATE_DAYS}
+            if not in_patch:
+                continue
+            host = max(in_patch, key=in_patch.get)
+            if in_patch[host] == 0:
+                continue
+            assert fold_of[s_] == fold_of[season[host]]
+            mapping[f_] = host
+            stats.append((s_, k, f_, host, n[f_], days[f_]))
+    orig = d.event.copy()
+    d["event"] = d.event.replace(mapping)
+    st = pd.DataFrame(stats, columns=["season", "key", "fragment", "host", "detections", "days"])
+    st.to_csv(PROCESSED / "absorbed_fragments.csv", index=False)
+    print(f"Fragments absorbed: {len(st)} events ({int(st.detections.sum()) if len(st) else 0} detections) "
+          f"into {st.host.nunique() if len(st) else 0} hosts; by season {st.groupby('season').size().to_dict()}")
+    return orig.where(orig != d.event, -1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -400,11 +480,12 @@ def main():
     print(f"Similar-profile events for review: {int(review.sum())} -> review_similar_events.csv")
     d["exclude_reason"] = d.event.map(reason)
     print("Excluded events:", reason.value_counts().to_dict())
+    d["absorbed_from"] = absorb_fragments(d, fday)
     out = PROCESSED / "fire_events.parquet"
     tmp = out.with_suffix(".tmp")
     cols = ["latitude", "longitude", "x", "y", "time", "season", "frp", "daynight",
             "confidence", "deeca_type", "deeca_firekey", "event", "event_source", "split",
-            "exclude_reason"]
+            "exclude_reason", "absorbed_from"]
     d[cols].to_parquet(tmp, index=False)
     tmp.rename(out)
     print(f"{d.event.nunique():,} events -> {out}")

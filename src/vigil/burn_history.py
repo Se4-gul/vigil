@@ -67,6 +67,27 @@ def grid() -> tuple[Affine, int, int]:
     return Affine(GRID_RES_M, 0, x0, 0, -GRID_RES_M, y1), height, width
 
 
+_EDGE = None
+
+
+def edge_distance_km() -> np.ndarray:
+    """Distance (km) from each grid cell centre to the edge of the config
+    lon/lat box, negative outside it. FIRMS, BARRA, SILO and the fuel map stop
+    at that box, so fires crossing it are clipped and inputs beyond it are
+    missing."""
+    global _EDGE
+    if _EDGE is None:
+        transform, h, w = grid()
+        xs = transform.c + transform.a * (np.arange(w) + 0.5)
+        ys = transform.f + transform.e * (np.arange(h) + 0.5)
+        X, Y = np.meshgrid(xs, ys)
+        lon, lat = Transformer.from_crs(GRID_CRS, 4326, always_xy=True).transform(X, Y)
+        kx = 111.32 * np.cos(np.radians(lat))
+        _EDGE = np.minimum.reduce([(LON_MAX - lon) * kx, (lon - LON_MIN) * kx,
+                                   (LAT_MAX - lat) * 110.57, (lat - LAT_MIN) * 110.57]).astype(np.float32)
+    return _EDGE
+
+
 def season_from_label(s: pd.Series) -> pd.Series:
     """'1970-71 Wildfire' or '2013/2014' -> 1971 / 2014 (season = year it ends)."""
     start = s.str.extract(r"(\d{4})")[0].astype(float)

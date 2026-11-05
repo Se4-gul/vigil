@@ -7,7 +7,7 @@ Loss: weighted binary cross-entropy (pos_weight = fire weight) over the loss
 mask only (uncertain cells, other fires and far new ignitions excluded).
 Hyperparameters tuned in the season CV: fire weight, no-burn sampling rate.
 
-Inputs: the 32 channels of dataset.py, minus ablated groups, plus the physics
+Inputs: the 33 channels of dataset.py (incl. the validity channel, never dropped), minus ablated groups, plus the physics
 arrival-time channel if --physics (1 - arrival/24 for cells reached within
 24 h, 0 otherwise; scale 1.0, precomputed by physics.py).
 
@@ -38,7 +38,8 @@ import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt
 
 from vigil.config import CV_FOLDS, PROCESSED
-from vigil.dataset import CHANNELS, DRYNESS, STATS, VECTORS, WEATHER, Data, normalise, rotate
+from vigil.dataset import (CHANNELS, DRYNESS, STATS, VECTORS, WEATHER, Data, align_wind, normalise,
+                           rotate, rotate_fields, wind_angle)
 from vigil.evaluate import BANDS, PAD
 from vigil.static import FUEL_GROUPS, SLOPE_THRESHOLDS
 from vigil.windows import SIZE
@@ -140,8 +141,14 @@ def channel_index(drop: list[str]) -> list[int]:
 
 
 class Windows(torch.utils.data.Dataset):
-    def __init__(self, idx, stats, keep, physics: bool, augment: bool, seed=0):
+    """align: rotate each window so its D+1 peak wind (mean over active fire on
+    D) points up, by the exact angle; augmentation is then jitter + left-right
+    flip only (a flip keeps "up"). Cells rotated in from beyond the cached
+    160 x 160 window are masked from the loss and missing (0) as inputs."""
+
+    def __init__(self, idx, stats, keep, physics: bool, augment: bool, seed=0, align=False):
         self.idx, self.keep, self.physics, self.augment = list(idx), keep, physics, augment
+        self.align = align
         self.X = np.load(CACHE / "X.npy", mmap_mode="r")
         self.Y = np.load(CACHE / "y.npy", mmap_mode="r")
         self.M = np.load(CACHE / "mask.npy", mmap_mode="r")
@@ -155,6 +162,8 @@ class Windows(torch.utils.data.Dataset):
     def __getitem__(self, j):
         i = self.idx[j]
         dr, dc = self.rng.integers(0, 2 * MARGIN + 1, 2) if self.augment else (MARGIN, MARGIN)
+        if self.align:
+            return self._aligned(i, dr, dc)
         sl = (slice(dr, dr + SIZE), slice(dc, dc + SIZE))
         X = np.asarray(self.X[i][:, sl[0], sl[1]], np.float32)
         y = np.asarray(self.Y[i][sl], np.float32)
@@ -165,6 +174,24 @@ class Windows(torch.utils.data.Dataset):
             X, y, m = rotate(X, y, m, int(self.rng.integers(4)), bool(self.rng.integers(2)))
         base = normalise(X[:len(CHANNELS)], self.stats)[self.keep]
         X = np.concatenate([base, X[len(CHANNELS):]]) if self.physics else base
+        return torch.from_numpy(X.copy()), torch.from_numpy(y.copy()), torch.from_numpy(m.copy())
+
+    def _aligned(self, i, dr, dc):
+        X = np.asarray(self.X[i], np.float32)
+        y = np.asarray(self.Y[i], np.float32)
+        m = np.asarray(self.M[i], np.float32)
+        if self.physics:
+            X = np.concatenate([X, np.asarray(self.P[i], np.float32)[None]])
+        act = X[CHANNELS.index("active_D")] > 0
+        phi = wind_angle(X[:len(CHANNELS)], act)
+        centre = ((BIG - 1) / 2 + dr - MARGIN, (BIG - 1) / 2 + dc - MARGIN)
+        X = align_wind(X, phi, (SIZE, SIZE), centre_in=centre)
+        ym = rotate_fields(np.stack([y, m]), phi, (SIZE, SIZE), centre_in=centre, order=0, cval=0.0)
+        y, m = ym[0], ym[1]
+        if self.augment and self.rng.integers(2):
+            X, y, m = rotate(X, y, m, 0, True)
+        base = normalise(X[:len(CHANNELS)], self.stats)[self.keep]
+        X = np.concatenate([base, np.nan_to_num(X[len(CHANNELS):])]) if self.physics else base
         return torch.from_numpy(X.copy()), torch.from_numpy(y.copy()), torch.from_numpy(m.copy())
 
 
@@ -214,8 +241,34 @@ def masked_bce(logits, y, m, pos_weight):
 
 
 # ------------------------------------------------------------------ whole-fire scoring
-def score_fold(model, data: Data, fold: int | str, stats, keep, physics: bool):
-    """Counts of positives/negatives per (band, probability bin) on whole fires."""
+def predict_region(model, X, stats, keep, phys=None, align=False):
+    """Probabilities for a whole-fire region. X raw [C, h, w]; phys [h, w] or None.
+    align: rotate the region so the D+1 wind points up (exact angle, onto a
+    canvas covering the rotated region), predict, rotate the result back."""
+    h, wd = X.shape[1:]
+    if phys is not None:
+        X = np.concatenate([X, phys[None]])
+    if align:
+        phi = wind_angle(X[:len(CHANNELS)], X[CHANNELS.index("active_D")] > 0)
+        S = int(np.ceil(np.hypot(h, wd))) + 2
+        X = align_wind(X, phi, (S, S))
+    base = normalise(X[:len(CHANNELS)], stats)[keep]
+    Xn = np.concatenate([base, np.nan_to_num(X[len(CHANNELS):])]) if phys is not None else base
+    H, W = Xn.shape[1:]
+    ph, pw = (-H) % 8, (-W) % 8
+    Xt = torch.from_numpy(np.pad(Xn, ((0, 0), (0, ph), (0, pw)), mode="edge")).to(DEVICE)
+    prob = torch.sigmoid(model(Xt[None]))[0, :H, :W].float().cpu().numpy()
+    if align:
+        prob = rotate_fields(prob[None], -phi, (h, wd), centre_in=((H - 1) / 2, (W - 1) / 2),
+                             centre_out=((h - 1) / 2, (wd - 1) / 2), order=1, cval=0.0)[0]
+    return prob
+
+
+def score_fold(model, data: Data, fold: int | str, stats, keep, physics: bool, align=False,
+               transform=None):
+    """Counts of positives/negatives per (band, probability bin) on whole fires.
+    transform: optional function applied to the raw inputs first (sensitivity
+    tests)."""
     w = pd.read_parquet(PROCESSED / "windows.parquet")
     w = w[w.fold == str(fold)]
     fd = w.drop_duplicates(["season", "event", "day"])
@@ -238,14 +291,11 @@ def score_fold(model, data: Data, fold: int | str, stats, keep, physics: bool):
                 burnt = X[ib] > 0
                 if not burnt.any():
                     continue
-                Xn = normalise(X, stats)[keep]
-                if physics:
-                    Xn = np.concatenate([Xn, physics_slice(stores[season], int(event), int(D),
-                                                           r0, c0, r1 - r0, c1 - c0)[None]])
-                h, wd = Xn.shape[1:]
-                ph, pw = (-h) % 8, (-wd) % 8
-                Xt = torch.from_numpy(np.pad(Xn, ((0, 0), (0, ph), (0, pw)), mode="edge")).to(DEVICE)
-                prob = torch.sigmoid(model(Xt[None]))[0, :h, :wd].float().cpu().numpy()
+                if transform is not None:
+                    X = transform(X)
+                phys = (physics_slice(stores[season], int(event), int(D), r0, c0, r1 - r0, c1 - c0)
+                        if physics else None)
+                prob = predict_region(model, X, stats, keep, phys, align)
                 valid = mask & ~burnt
                 band = np.digitize(distance_transform_edt(~burnt), BANDS, right=True)
                 b = np.minimum((prob * PROB_BINS).astype(int), PROB_BINS - 1)
@@ -284,7 +334,7 @@ def best_threshold(pos, neg):
 
 # ------------------------------------------------------------------ training
 def train(fold: int, physics=False, drop=(), base=16, fire_weight=10.0, no_burn_rate=0.5,
-          epochs=30, batch=16, lr=1e-3, patience=6, seed=0, max_batches=None, tag=None):
+          epochs=30, batch=16, lr=1e-3, patience=6, seed=0, max_batches=None, tag=None, align=False):
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     cw = pd.read_parquet(CACHE / "windows.parquet")
@@ -298,14 +348,15 @@ def train(fold: int, physics=False, drop=(), base=16, fire_weight=10.0, no_burn_
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     fit_idx = cw.index[cw.fold.isin([str(f) for f in fit_folds])]
     val_idx = cw.index[cw.fold == str(inner_val)]
-    val = torch.utils.data.DataLoader(Windows(val_idx, stats, keep, physics, augment=False), batch_size=batch)
+    val = torch.utils.data.DataLoader(Windows(val_idx, stats, keep, physics, augment=False, align=align),
+                                      batch_size=batch)
     best, best_state, bad, log = np.inf, None, 0, []
     t0 = time.time()
     for ep in range(epochs):
         burn = cw.loc[fit_idx].has_new_burn.values
         pick = fit_idx[burn | (rng.random(len(fit_idx)) < no_burn_rate)]
-        dl = torch.utils.data.DataLoader(Windows(pick, stats, keep, physics, augment=True, seed=seed + ep),
-                                         batch_size=batch, shuffle=True)
+        dl = torch.utils.data.DataLoader(Windows(pick, stats, keep, physics, augment=True, seed=seed + ep,
+                                                 align=align), batch_size=batch, shuffle=True)
         model.train()
         tl, nb = 0.0, 0
         for X, y, m in dl:

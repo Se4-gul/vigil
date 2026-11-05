@@ -1,6 +1,6 @@
 """Turn a window (event, fire day D, centre) into model tensors.
 
-Inputs, 32 channels, 128 x 128 at 375 m:
+Inputs, 33 channels, 128 x 128 at 375 m:
   fire       active_D (this fire's cells burning on D), own_burnt (this fire's
              cells burnt up to and including D)
   history    tslb: years since last burnt (MCD64A1 earlier seasons + FIRMS this
@@ -11,6 +11,11 @@ Inputs, 32 channels, 128 x 128 at 375 m:
   weather    for D and D+1 (D+1 = the day being predicted; assumes a perfect
              forecast): ws_max, u_peak, v_peak (vector), t_max, rh_min, and
              peak McArthur FFDI (with that day's drought factor)
+  valid      1 inside the study box, 0 outside. FIRMS, BARRA, SILO and the
+             fuel map stop at the box, so outside it fuel, dryness and weather
+             are missing: they're NaN in X and become 0 (the mean) after
+             normalisation (`normalise`), instead of fake "non-burnable" fuel
+             or repeated edge weather. Terrain and tslb (MCD64A1) are real there.
 Target: this fire's cells newly burnt on D+1.
 Loss mask: 0 where the label isn't trustworthy: the uncertain mask
 (0 < uncertain_day <= D+1), other modelling fires burning by D+1 in the
@@ -36,7 +41,7 @@ import xarray as xr
 from pyproj import Transformer
 from scipy.ndimage import distance_transform_edt, map_coordinates
 
-from vigil.burn_history import CAP_YEARS, grid, tslb
+from vigil.burn_history import CAP_YEARS, edge_distance_km, grid, tslb
 from vigil.config import CV_FOLDS, PROCESSED
 from vigil.static import FUEL_GROUPS, SLOPE_THRESHOLDS
 from vigil.windows import SIZE, window_origin
@@ -49,12 +54,15 @@ DRYNESS = ["kbdi", "df"]
 CHANNELS = (["active_D", "own_burnt", "tslb"] + TERRAIN + list(FUEL_GROUPS)
             + [f"{v}_D" for v in DRYNESS]
             + [f"{v}_D" for v in WEATHER] + [f"{v}_D1" for v in WEATHER]
-            + ["ffdi_D", "ffdi_D1"])
+            + ["ffdi_D", "ffdi_D1"] + ["valid"])
 VECTORS = [("grad_x", "grad_y"), ("u_peak_D", "v_peak_D"), ("u_peak_D1", "v_peak_D1")]
 # Channels left as they are (fractions, masks, tslb already scaled to 0-1).
-NO_NORM = {"active_D", "own_burnt", "tslb"} | {f"slope_gt{t}" for t in SLOPE_THRESHOLDS} \
+NO_NORM = {"active_D", "own_burnt", "tslb", "valid"} | {f"slope_gt{t}" for t in SLOPE_THRESHOLDS} \
           | set(FUEL_GROUPS)
 STATS = PROCESSED / "norm_stats.json"
+# Channels with no data outside the study box.
+MISSING_OUTSIDE = (list(FUEL_GROUPS) + [f"{v}_D" for v in DRYNESS]
+                   + [f"{v}_{d}" for d in ("D", "D1") for v in WEATHER] + ["ffdi_D", "ffdi_D1"])
 
 
 class Data:
@@ -75,6 +83,7 @@ class Data:
         self.dry_days = {int((pd.Timestamp(d) - EPOCH).days): i for i, d in enumerate(dry.day.values)}
         self.dry_lat, self.dry_lon = dry.lat.values, dry.lon.values
         self._grid_geometry()
+        self.inside = edge_distance_km() >= 0
 
     def _grid_geometry(self):
         """Fractional BARRA indices of every grid cell, and the angle from grid
@@ -149,6 +158,11 @@ class Data:
             # Peak McArthur FFDI: 2 exp(-0.45 + 0.987 ln DF + max hourly weather terms).
             ch["ffdi" + suffix] = 2 * np.exp(-0.45 + 0.987 * np.log(np.maximum(df[day], 0.1))
                                              + wx[FFDI_TERMS])
+        inside = self.inside[sl]
+        ch["valid"] = inside
+        if not inside.all():
+            for k in MISSING_OUTSIDE:
+                ch[k] = np.where(inside, ch[k], np.nan)
         X = np.stack([np.asarray(ch[k], dtype=np.float32) for k in CHANNELS])
         y = (own & (bd == D + 1)).astype(np.float32)
         other = (ev >= 0) & ~own & (bd > 0) & (bd <= D + 1)
@@ -210,6 +224,64 @@ def rotate(X, y, mask, k: int, flip: bool):
     return X, y, mask
 
 
+# ------------------------------------------------------------------ wind alignment
+# Channels resampled with nearest neighbour when rotating by an arbitrary angle.
+NEAREST = {"active_D", "own_burnt", "valid"}
+
+
+def wind_angle(X: np.ndarray, where: np.ndarray | None = None) -> float:
+    """Counter-clockwise rotation (radians) that makes the mean D+1 peak wind
+    (over `where`, e.g. active fire; else the whole array) point up (grid
+    north). Wind components point the way the wind blows."""
+    u, v = X[CHANNELS.index("u_peak_D1")], X[CHANNELS.index("v_peak_D1")]
+    sel = where if where is not None and where.any() else np.ones(u.shape, bool)
+    sel = sel & np.isfinite(u)
+    if not sel.any():
+        return 0.0
+    return float(np.arctan2(u[sel].mean(), v[sel].mean()))
+
+
+def rotate_fields(A: np.ndarray, phi: float, out_shape: tuple, centre_in=None, centre_out=None,
+                  order: int = 1, cval: float = np.nan) -> np.ndarray:
+    """Rotate [C, h, w] arrays counter-clockwise by phi about centre_in, onto an
+    out_shape grid whose centre_out lands on centre_in. Values only, vector
+    components are not changed (see rotate_vectors)."""
+    h, w = A.shape[1:]
+    H, W = out_shape
+    ci = centre_in if centre_in is not None else ((h - 1) / 2, (w - 1) / 2)
+    co = centre_out if centre_out is not None else ((H - 1) / 2, (W - 1) / 2)
+    i, j = np.mgrid[0:H, 0:W].astype(np.float32)
+    xo, yo = j - co[1], -(i - co[0])                       # east, north offsets
+    c, s_ = np.cos(phi), np.sin(phi)
+    x, y = c * xo + s_ * yo, -s_ * xo + c * yo              # inverse rotation R(-phi)
+    rows, cols = ci[0] - y, ci[1] + x
+    return np.stack([map_coordinates(a, [rows, cols], order=order, mode="constant", cval=cval)
+                     for a in A]).astype(np.float32)
+
+
+def rotate_vectors(X: np.ndarray, phi: float) -> np.ndarray:
+    """Rotate every (east, north) vector channel pair counter-clockwise by phi."""
+    X = X.copy()
+    c, s_ = np.cos(phi), np.sin(phi)
+    for cx, cy in VECTORS:
+        i, j = CHANNELS.index(cx), CHANNELS.index(cy)
+        u, v = X[i].copy(), X[j].copy()
+        X[i], X[j] = c * u - s_ * v, s_ * u + c * v
+    return X
+
+
+def align_wind(X: np.ndarray, phi: float, out_shape: tuple, centre_in=None, centre_out=None) -> np.ndarray:
+    """Rotate inputs (CHANNELS first, any extra scalar channels after) by phi:
+    image and vector components together. Cells from beyond the input become
+    NaN (missing)."""
+    near = np.array([k in NEAREST for k in CHANNELS] + [False] * (len(X) - len(CHANNELS)))
+    out = np.empty((len(X), *out_shape), np.float32)
+    if near.any():
+        out[near] = rotate_fields(X[near], phi, out_shape, centre_in, centre_out, order=0)
+    out[~near] = rotate_fields(X[~near], phi, out_shape, centre_in, centre_out, order=1)
+    return rotate_vectors(out, phi)
+
+
 def norm_stats(data: Data, windows: pd.DataFrame, n: int = 400, seed: int = 0) -> dict:
     """Per-channel mean/std over a sample of windows (training folds only)."""
     pick = windows.sample(min(n, len(windows)), random_state=seed)
@@ -221,6 +293,7 @@ def norm_stats(data: Data, windows: pd.DataFrame, n: int = 400, seed: int = 0) -
     out = {}
     for k, v in acc.items():
         a = np.concatenate(v)
+        a = a[np.isfinite(a)]
         # Vector components: centre at 0 and share one scale, so directions survive.
         out[k] = {"mean": float(a.mean()), "std": float(a.std() + 1e-6)}
     for cx, cy in VECTORS:
@@ -231,11 +304,13 @@ def norm_stats(data: Data, windows: pd.DataFrame, n: int = 400, seed: int = 0) -
 
 
 def normalise(X: np.ndarray, stats: dict) -> np.ndarray:
+    """Standardise the first len(CHANNELS) channels; missing values (NaN,
+    outside the study box) become 0, the training mean."""
     X = X.copy()
     for k, s in stats.items():
         i = CHANNELS.index(k)
         X[i] = (X[i] - s["mean"]) / s["std"]
-    return X
+    return np.nan_to_num(X, nan=0.0)
 
 
 def write_stats() -> None:

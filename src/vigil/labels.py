@@ -28,8 +28,8 @@ import xarray as xr
 from scipy import ndimage
 from scipy.spatial import cKDTree
 
-from vigil.burn_history import grid
-from vigil.config import GRID_RES_M, PROCESSED, fire_day
+from vigil.burn_history import edge_distance_km, grid
+from vigil.config import EDGE_MASK_KM, GRID_RES_M, PROCESSED, fire_day
 
 TOUCH_CELLS = 2      # detection within 2 cells (750 m) of a patch belongs to it
 IDW_K, IDW_POWER = 8, 2
@@ -226,6 +226,10 @@ def build() -> None:
                    detections outside any MCD64A1 outline, cells of excluded
                    events, and MCD64A1 burnt patches with no detections. On
                    prediction day D, mask cells with 0 < uncertain_day <= D + 1.
+                   Edge: cells within EDGE_MASK_KM of the study box (or outside
+                   it) get uncertain_day = 1, i.e. always masked, and cells
+                   outside the box lose their labels (their burn day would
+                   come from detections inside the box).
 
     Events with no MCD64A1 area, or fewer MCD64A1 cells than half their detected
     cells, are dropped (their cells become uncertain), so train and test labels
@@ -261,6 +265,8 @@ def build() -> None:
     burn = np.zeros((len(seasons), height, width), dtype=np.int32)
     owner = np.full((len(seasons), height, width), -1, dtype=np.int32)
     unc = np.zeros((len(seasons), height, width), dtype=np.int32)
+    edge = edge_distance_km()
+    outside_box, near_edge = edge < 0, edge < EDGE_MASK_KM
     for i, season in enumerate(seasons):
         mcd, bd, ev, det = per_season[season]
         good = (ev >= 0) & np.isin(ev, list(modelled))
@@ -277,6 +283,9 @@ def build() -> None:
         r, c, fd = first.row.values[outside], first.col.values[outside], first.fire_day.values[outside]
         cur = u[r, c]
         u[r, c] = np.where((cur == 0) | (fd < cur), fd, cur)
+        burn[i][outside_box] = 0
+        owner[i][outside_box] = -1
+        u[near_edge] = 1
         unc[i] = u
 
     ys = transform.f + transform.e * (np.arange(height) + 0.5)

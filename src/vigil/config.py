@@ -26,6 +26,9 @@ def raw_dir(name: str) -> Path:
 # decision (see CLAUDE.md); 375 m matches the VIIRS pixel and is provisional.
 GRID_CRS = 3111
 GRID_RES_M = 375
+# Cells within this distance of the box edge (or outside it) are masked from
+# loss and scoring: fires there may be clipped or fed by fire we can't see.
+EDGE_MASK_KM = 6
 
 # Fire days run 06:00-06:00 local time in Victoria (FIRMS times are UTC), so
 # the ~02:00 night overpass counts toward the day whose fire it shows. With

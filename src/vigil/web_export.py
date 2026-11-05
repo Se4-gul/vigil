@@ -1,6 +1,8 @@
 """Export fire replays for the static website (app/).
 
-For each labelled fire of a season (Oct-Apr scope, at least MIN_CELLS cells):
+For each labelled fire of a season (Oct-Apr scope, at least MIN_CELLS cells,
+burning on at least MIN_DAYS days, and not clipped by the study box, i.e. its
+MCD64A1 burnt patch doesn't extend past the box edge):
   app/data/fire_<event>.png  burn day per cell, reprojected to Web Mercator
                              (EPSG:3857) so it overlays the basemap exactly.
                              R + 256*G = days since the fire's first burn day,
@@ -24,12 +26,14 @@ from rasterio.crs import CRS
 from rasterio.transform import from_origin
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
-from vigil.burn_history import grid
+from vigil.burn_history import edge_distance_km, grid
 from vigil.config import GRID_CRS, PROCESSED, ROOT
+from vigil.labels import mcd_season, patches
 
 OUT = ROOT / "app" / "data"
 EPOCH = pd.Timestamp("2000-01-01")
 MIN_CELLS = 300
+MIN_DAYS = 3
 TOWNS = {
     "Mallacoota": (-37.553, 149.754), "Buchan": (-37.497, 148.176), "Orbost": (-37.708, 148.456),
     "Bairnsdale": (-37.823, 147.610), "Omeo": (-37.098, 147.594), "Bright": (-36.730, 146.960),
@@ -55,11 +59,21 @@ def build(season: int = 2020) -> None:
     ids, counts = np.unique(ev[inscope], return_counts=True)
     to_ll = Transformer.from_crs(GRID_CRS, 4326, always_xy=True)
     OUT.mkdir(parents=True, exist_ok=True)
-    fires = []
+    for old in OUT.glob("fire_*.png"):
+        old.unlink()
+    edge = edge_distance_km()
+    patch = patches(mcd_season(season) > 0)
+    clipped_patches = set(np.unique(patch[edge < 0])) - {0}
+    fires, skipped = [], []
     for e, n in sorted(zip(ids, counts), key=lambda t: -t[1]):
         if n < MIN_CELLS:
             break
         r, c = np.nonzero(inscope & (ev == e))
+        n_days = len(np.unique(bd[r, c]))
+        clipped = bool(set(np.unique(patch[r, c])) & clipped_patches)
+        if n_days < MIN_DAYS or clipped:
+            skipped.append((int(e), int(n), n_days, "clipped" if clipped else "short"))
+            continue
         pad = 8
         r0, r1 = max(r.min() - pad, 0), min(r.max() + pad + 1, H)
         c0, c1 = max(c.min() - pad, 0), min(c.max() + pad + 1, W)
@@ -100,6 +114,7 @@ def build(season: int = 2020) -> None:
     (OUT / "fires.json").write_text(json.dumps({"season": f"{season - 1}–{str(season)[2:]}", "fires": fires}))
     size = sum(p.stat().st_size for p in OUT.glob("*")) / 1e6
     print(f"{len(fires)} fires -> {OUT} ({size:.1f} MB)")
+    print("  skipped (event, cells, burn days, why):", skipped)
     for f in fires[:12]:
         print(f"  {f['label']:<22} {f['kha']:>8} kha  {f['first']} +{f['days']} d  (event {f['id']})")
 

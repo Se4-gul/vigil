@@ -63,6 +63,7 @@ def prepare(seed: int = 0) -> None:
             c0, c1 = max(c.min() - PAD, 0), min(c.max() + PAD + 1, data.W)
             for _, row in fe.iterrows():
                 X, y, mask = data.region(int(season), int(e), int(row.day), r0, r1, c0, c1)
+                X = np.nan_to_num(X)     # missing outside the study box (always masked there)
                 burnt = X[ib] > 0
                 if not burnt.any():
                     continue
