@@ -18,6 +18,7 @@ threshold that maximise F1; then refit on all 4 and score the held-out fold.
 Usage:
   python -m vigil.pixel_baselines prepare    # build the sampled feature pool
   python -m vigil.pixel_baselines run
+  python -m vigil.pixel_baselines rf_check   # shallow-RF overfitting check
 """
 
 import argparse
@@ -174,8 +175,51 @@ def main():
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("prepare")
     sub.add_parser("run")
+    sub.add_parser("rf_check")
     args = parser.parse_args()
-    prepare() if args.cmd == "prepare" else run()
+    {"prepare": prepare, "run": run, "rf_check": rf_check}[args.cmd]()
+
+
+
+def rf_check(seed: int = 0) -> None:
+    """Timeboxed overfitting check: shallow RF grid (depth x min leaf), with
+    train / inner out-of-fold / held-out F1 per fold."""
+    z = np.load(POOL)
+    X, y, w, fold, far = z["X"], z["y"], z["w"], z["fold"], z["far"]
+    rng = np.random.default_rng(seed)
+    grid_ = [(d, leaf) for d in (4, 8, 12) for leaf in (50, 200)]
+    rows = []
+    for f in range(5):
+        train_folds = [g for g in range(5) if g != f]
+        tr = np.nonzero(np.isin(fold, train_folds))[0]
+        best = None
+        for depth, leaf in grid_:
+            oof = np.zeros(len(tr), np.float32)
+            for g in train_folds:
+                fit_idx = balanced(tr[fold[tr] != g], y, far, rng)
+                m = RandomForestClassifier(n_estimators=100, max_depth=depth, min_samples_leaf=leaf,
+                                           max_features="sqrt", n_jobs=-1, random_state=0)
+                m.fit(X[fit_idx], y[fit_idx])
+                sel = fold[tr] == g
+                oof[sel] = m.predict_proba(X[tr[sel]])[:, 1]
+            thr, f1_oof = best_threshold(oof, y[tr], w[tr])
+            if best is None or f1_oof > best[2]:
+                best = (depth, leaf, f1_oof, thr)
+        depth, leaf, f1_oof, thr = best
+        fit_idx = balanced(tr, y, far, rng)
+        m = RandomForestClassifier(n_estimators=100, max_depth=depth, min_samples_leaf=leaf,
+                                   max_features="sqrt", n_jobs=-1, random_state=0).fit(X[fit_idx], y[fit_idx])
+        f1_train = metrics(m.predict_proba(X[tr])[:, 1], y[tr], w[tr], thr)[0]
+        te = np.nonzero(fold == f)[0]
+        s = m.predict_proba(X[te])[:, 1]
+        f1_te, _, _, ap = metrics(s, y[te], w[te], thr)
+        rows.append({"fold": f, "depth": depth, "min_leaf": leaf, "F1_train": f1_train,
+                     "F1_inner_oof": f1_oof, "F1_heldout": f1_te, "PR_AUC_heldout": ap})
+        print(rows[-1], flush=True)
+    r = pd.DataFrame(rows)
+    r.to_csv(PROCESSED / "rf_check.csv", index=False)
+    print(r.round(3).to_string(index=False))
+    print(r[["F1_train", "F1_inner_oof", "F1_heldout", "PR_AUC_heldout"]].agg(["mean", "std"]).round(3).to_string())
 
 
 if __name__ == "__main__":

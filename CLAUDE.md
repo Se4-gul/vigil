@@ -116,7 +116,10 @@ Download scripts are in `src/vigil/data/`; settings are in `src/vigil/config.py`
   | Wind-shifted (active fire) | **0.215 ± 0.083** | 0.122 | 0.190 | 0.271 | **0.110** |
   | Logistic regression (Huot-style) | 0.193 ± 0.056 | 0.107 | 0.211 | 0.184 | 0.091 |
   | Random forest (Huot-style) | 0.047 ± 0.023 | 0.024 | 0.124 | 0.071 | 0.029 |
-  The distance baselines score 0 beyond 6 km. The random forest result is anomalous (far below logistic regression and persistence, the reverse of Huot et al.), so it isn't trusted until investigated; see Todo.
+  The distance baselines score 0 beyond 6 km. The random forest result was checked (see the finding below): it's a genuine failure to generalise across seasons, not a bug.
+
+- Finding (random forest, 2026-11-05, timeboxed check): not a bug. Class order is correct (`classes_` = [False, True], column 1 = fire); scores aren't inverted (training ROC-AUC 0.986); features and labels line up (active fire in the 3×3 neighbourhood: 22.6% of positives vs 0.1% of negatives). The forest fits its training seasons (depth 12: best F1 0.33–0.35, weighted PR-AUC 0.23, twice logistic regression) but doesn't transfer: held-out best possible F1 is 0.09–0.10 (PR-AUC ~0.03) on folds 0 and 2, and shallower forests (depth 4–6, leaf 50–200) are worse on both training and held-out data. Its top features are fuel shares and temperature, not the fire neighbourhood; with `max_features="sqrt"` only ~17 of 288 features are offered per split, so the 18 fire-neighbourhood features are rarely used and the forest learns season-specific fuel/weather patterns. Huot's random forest beat logistic regression under a random-week split (the same seasons in train and test), which hides this. Recorded as a finding; random forest dropped from the baseline list. (The earlier "training F1 as low as held-out" came from the depth-4 forest the inner tuning picked, scored at a threshold carried over from other models.)
+- 2026-11-05: Physics baseline built (`src/vigil/physics.py`), with the approved assumptions. One-fire-day check, before any tuning (ROS scale 1), predicting 9 Feb 2014 from 8 Feb for the East Gippsland fire (`docs/figures/physics_example_2014-02-09.png`): starting from active fire on D, F1 0.48 (precision 0.42, recall 0.55); starting from all burnt area, F1 0.36; active-fire persistence on the same day 0.14. About 4 s per fire-day. Most misses are further downwind than predicted (spread rate too low before tuning); starting from all burnt area adds false alarms around dead fire. Starting point: active fire on D (decided 2026-11-05, replacing "all burnt area" from the approved plan). Why: in the CV baselines most of the burnt perimeter is dead (persistence from active fire F1 0.209 vs 0.139 from all burnt area), and on the example day starting from all burnt area adds false alarms around dead fire (F1 0.36 vs 0.48). Burnt cells are non-burnable but don't spread.
 
 ## Website design notes
 From Rishi's feedback on the first East Gippsland animation (2026-11-05):
@@ -130,6 +133,7 @@ From Rishi's feedback on the first East Gippsland animation (2026-11-05):
 - Website stack
 
 ## Todo
-- Investigate the random forest baseline (F1 0.047, PR-AUC 0.029, far below logistic regression): check for overfitting to day-level weather (our CV is by season, Huot's was by random week), threshold transfer from inner to final models, and a fire-channels-only sanity run.
+- U-Net: run input ablations (e.g. without weather, without fuel, fire channels only). The random forest finding shows flexible models can learn season-specific fuel/weather shortcuts instead of spread, so check what the U-Net actually uses.
+- Low priority: rerun logistic regression and random forest with a Huot-style random-week split, to show how much the split choice (leakage across weeks of the same season) inflates scores.
 - Physics baseline (cellular automaton): plan approved, assumptions in Decisions; to build.
 - Later: compare training with vs without the unmatched events (scored on validation), to check that they help and don't just add noise.
