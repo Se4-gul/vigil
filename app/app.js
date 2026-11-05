@@ -3,10 +3,34 @@
 // burn day, A = burnt. The browser colours cells by age on a canvas source:
 // burning cells ease in (soft amber), then fade to muted embers over a few days.
 
-const AMBER = [239, 184, 115];
-const EMBER = [122, 90, 76];
-const FADE_DAYS = 6;          // amber -> ember
-const DAYS_PER_SECOND = 2.2;  // playback speed
+// Colour by age (days since the cell's burn day). Warm only while active and
+// recent; then a cool, desaturated ash a little lighter than land (a scar).
+// Stops: [age, r, g, b, alpha 0-255]. Pick with ?palette=a|b|c.
+const PALETTES = {
+  a: { name: "Amber → rose → ash",
+       stops: [[0, 240, 190, 120, 235], [2, 214, 140, 120, 220], [7, 132, 136, 142, 150]] },
+  b: { name: "Pale gold → dusty rose → slate ash",
+       stops: [[0, 246, 208, 146, 235], [2.5, 196, 124, 132, 210], [8, 116, 125, 136, 140]] },
+  c: { name: "Amber → copper → light ash",
+       stops: [[0, 236, 178, 106, 235], [3, 186, 118, 86, 215], [9, 146, 148, 150, 155]] },
+};
+const PALETTE = PALETTES[new URLSearchParams(location.search).get("palette")] || PALETTES.a;
+const LUT_STEP = 0.05, LUT_MAX = 12;
+const LUT = (() => {                      // age -> rgba, precomputed
+  const n = Math.ceil(LUT_MAX / LUT_STEP) + 1, out = new Uint8ClampedArray(4 * n), st = PALETTE.stops;
+  for (let i = 0; i < n; i++) {
+    const age = i * LUT_STEP;
+    let j = 0;
+    while (j < st.length - 2 && age > st[j + 1][0]) j++;
+    const [a0, ...c0] = st[j], [a1, ...c1] = st[Math.min(j + 1, st.length - 1)];
+    let f = a1 > a0 ? (age - a0) / (a1 - a0) : 1;
+    f = Math.max(0, Math.min(1, f)); f = f * f * (3 - 2 * f);
+    for (let k = 0; k < 4; k++) out[4 * i + k] = c0[k] + (c1[k] - c0[k]) * f;
+  }
+  return out;
+})();
+const GLOW = [255, 196, 120];             // halo on the active front
+const DAYS_PER_SECOND = 2.2;              // playback speed
 
 // Basemap: OpenFreeMap "dark" (vector tiles, free, no API key; OpenStreetMap
 // data, attribution comes with the style). Muted further below.
@@ -18,12 +42,29 @@ const map = new maplibregl.Map({
 });
 let firstLabelLayer;
 map.on("style.load", () => {
+  const set = (id, prop, v) => map.getLayer(id) && map.setPaintProperty(id, prop, v);
+  set("background", "background-color", "rgb(25,26,28)");           // land: a step lighter
+  set("water", "fill-color", "rgb(9,10,12)");                       // water: darkest
+  set("waterway", "line-color", "rgb(9,10,12)");
+  for (const id of ["landcover_wood", "landuse_park"]) set(id, "fill-color", "rgb(28,29,31)");
+  set("landuse_residential", "fill-color", "rgb(30,30,32)");
   for (const layer of map.getStyle().layers) {
     if (layer.type === "symbol" && !firstLabelLayer) firstLabelLayer = layer.id;   // fire goes under labels
-    if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) {
-      map.setPaintProperty(layer.id, "text-opacity", 0.7);
-    }
+    if (layer.type === "line" && layer["source-layer"] === "transportation") set(layer.id, "line-opacity", 0.45);
+    if (layer.type === "line" && layer["source-layer"] === "boundary") set(layer.id, "line-opacity", 0.6);
+    if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) set(layer.id, "text-opacity", 0.55);
   }
+  // Very subtle hillshade: AWS Terrain Tiles (Terrarium encoding; free, no key).
+  map.addSource("dem", {
+    type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: 12,
+    tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
+    attribution: 'Terrain: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles (AWS Open Data, Mapzen/Tilezen)</a>',
+  });
+  const firstLine = map.getStyle().layers.find(l => l.type === "line").id;
+  map.addLayer({ id: "hillshade", type: "hillshade", source: "dem",
+                 paint: { "hillshade-exaggeration": 0.35, "hillshade-shadow-color": "#000000",
+                          "hillshade-highlight-color": "#46484c", "hillshade-accent-color": "#000000" } },
+               firstLine);
   init();   // don't wait for every tile (the 'load' event)
 });
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
@@ -31,6 +72,9 @@ map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
 const $ = id => document.getElementById(id);
 const canvas = document.createElement("canvas");
 const ctx = canvas.getContext("2d");
+const activeCanvas = document.createElement("canvas"), actx = activeCanvas.getContext("2d");
+const glowCanvas = document.createElement("canvas"), gctx = glowCanvas.getContext("2d");
+let activeImg = null;
 let fire = null, dayOff = null, img = null, t = 0, playing = false, last = 0;
 
 const fmtDate = (first, d) => {
@@ -42,23 +86,26 @@ const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
 
 function render() {
   if (!dayOff) return;
-  const o = img.data;
+  const o = img.data, g = activeImg.data;
   for (let i = 0, n = dayOff.length; i < n; i++) {
     const d = dayOff[i], k = 4 * i;
+    g[k + 3] = 0;
     if (d < 0) { o[k + 3] = 0; continue; }
     const age = t - d;
     if (age <= 0) { o[k + 3] = 0; continue; }
-    if (age < 1) {                       // burning today: ease in
-      const a = smooth(age);
-      o[k] = AMBER[0]; o[k + 1] = AMBER[1]; o[k + 2] = AMBER[2]; o[k + 3] = 235 * a;
-    } else {                             // then fade to embers
-      const f = smooth((age - 1) / FADE_DAYS);
-      o[k] = AMBER[0] + (EMBER[0] - AMBER[0]) * f;
-      o[k + 1] = AMBER[1] + (EMBER[1] - AMBER[1]) * f;
-      o[k + 2] = AMBER[2] + (EMBER[2] - AMBER[2]) * f;
-      o[k + 3] = 235 - 95 * f;
+    const li = 4 * Math.min(Math.floor(age / LUT_STEP), LUT.length / 4 - 1);
+    const ease = age < 1 ? smooth(age) : 1;           // burning today: ease in
+    o[k] = LUT[li]; o[k + 1] = LUT[li + 1]; o[k + 2] = LUT[li + 2]; o[k + 3] = LUT[li + 3] * ease;
+    if (age < 1.5) {                                  // halo source: the active front
+      g[k] = GLOW[0]; g[k + 1] = GLOW[1]; g[k + 2] = GLOW[2];
+      g[k + 3] = 255 * ease * (1 - Math.max(0, age - 0.5));
     }
   }
+  actx.putImageData(activeImg, 0, 0);
+  gctx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+  gctx.filter = "blur(5px)";
+  gctx.drawImage(activeCanvas, 0, 0);
+  gctx.filter = "none";
   ctx.putImageData(img, 0, 0);
   const day = Math.min(Math.floor(t), fire.days - 1);
   $("date").textContent = fmtDate(fire.first, day);
@@ -97,16 +144,22 @@ async function loadFire(f) {
   dayOff = new Int16Array(im.width * im.height);
   for (let i = 0; i < dayOff.length; i++) dayOff[i] = px[4 * i + 3] ? px[4 * i] + 256 * px[4 * i + 1] : -1;
   img = ctx.createImageData(im.width, im.height);
+  for (const c of [activeCanvas, glowCanvas]) { c.width = im.width; c.height = im.height; }
+  activeImg = actx.createImageData(im.width, im.height);
   $("slider").max = f.days;
   t = 0;
-  const src = map.getSource("fire");
-  if (src) map.removeLayer("fire"), map.removeSource("fire");
+  for (const id of ["fire", "glow"]) if (map.getSource(id)) { map.removeLayer(id); map.removeSource(id); }
+  map.addSource("glow", { type: "canvas", canvas: glowCanvas, coordinates: f.corners, animate: true });
+  map.addLayer({ id: "glow", type: "raster", source: "glow",
+                 paint: { "raster-resampling": "linear", "raster-opacity": 0.55, "raster-fade-duration": 0 } },
+               firstLabelLayer);
   map.addSource("fire", { type: "canvas", canvas, coordinates: f.corners, animate: true });
   map.addLayer({ id: "fire", type: "raster", source: "fire",
                  paint: { "raster-resampling": "nearest", "raster-fade-duration": 0 } }, firstLabelLayer);
   const lons = f.corners.map(c => c[0]), lats = f.corners.map(c => c[1]);
   map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-                { padding: { top: 60, bottom: 110, left: 340, right: 60 }, duration: 900 });
+                { padding: { top: 60, bottom: 110, left: 340, right: 60 },
+                  duration: new URLSearchParams(location.search).has("day") ? 0 : 900 });
   render();
 }
 
@@ -124,7 +177,7 @@ async function init() {
   await loadFire(data.fires[0]);
   requestAnimationFrame(frame);
   const params = new URLSearchParams(location.search);
-  if (params.has("day")) { t = +params.get("day"); render(); }
+  if (params.has("day")) { t = params.get("day") === "end" ? fire.days : +params.get("day"); render(); }
   if (params.get("play") === "1") setPlaying(true);
 }
 
