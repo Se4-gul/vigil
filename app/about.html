@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vigil · About</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body class="page">
+  <header>
+    <a class="wordmark" href="index.html">Vigil</a>
+    <nav id="site-nav" aria-label="Pages"></nav>
+  </header>
+  <main>
+    <h1>About Vigil</h1>
+    <p class="lead">Vigil replays real bushfires in Victoria day by day and tests how well different models predict where a fire will burn next. It's a student research project.</p>
+
+    <p class="safety">Don't use Vigil to make decisions about your safety. It shows past fires and experimental predictions, not current conditions. For fire information and warnings, use <a href="https://www.emergency.vic.gov.au">VicEmergency</a> or your state's fire service, and follow official advice.</p>
+
+    <h2>What the replay shows</h2>
+    <p>Each coloured cell is a 375 m square of land, shown on the day it first burnt. Amber means it's burning that day, copper means it burnt in the last few days, and grey is the scar left behind.</p>
+    <p>The burnt area comes from MODIS satellite burned-area maps, which give each fire's final outline. The timing within that outline comes from VIIRS satellite fire detections: every cell takes the date of the nearest detection that agrees with the burned-area map to within a few days. This follows Parks (2014). A fire day runs from 6 am to 6 am, so a satellite pass at 2 am counts toward the day whose fire it saw.</p>
+
+    <h2>What it can't show</h2>
+    <ul>
+      <li>Timing is accurate to about a day. Smoke and cloud can hide a fire from the satellites for several days.</li>
+      <li>Small and fast grass fires are often missing, because the burned-area maps miss most of them.</li>
+      <li>Only October to April is covered: the fire season, and the months our weather data spans.</li>
+      <li>Cells are 375 m across. Nothing finer than that is real, so edges are softened rather than drawn sharp.</li>
+    </ul>
+
+    <h2>The models</h2>
+    <p>Vigil compares simple baselines (assume the fire keeps growing at its edge, optionally pushed downwind), a physics model built on the CSIRO fire-spread equations for forest, grassland and heath, and a neural network trained on past fires. Each one predicts the next day's burnt area and is tested on fire seasons it never saw. The 2019–20 Black Summer season is held back entirely as the final test. Results will appear on the Findings page.</p>
+
+    <h2>Data and credits</h2>
+    <ul>
+      <li>Active fire detections: NASA FIRMS, VIIRS 375 m (S-NPP and NOAA-20), NASA LANCE.</li>
+      <li>Burned area: MODIS MCD64A1 Collection 6.1, NASA LP DAAC (Giglio et al.).</li>
+      <li>Weather: Bureau of Meteorology BARRA2 reanalysis (BARRA-C2), CC BY 4.0.</li>
+      <li>Rainfall and temperature for dryness: SILO, Queensland Government, CC BY 4.0.</li>
+      <li>Terrain: Copernicus DEM GLO-90, © DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA.</li>
+      <li>Fuel types: CSIRO Bushfire Fuel Classification fuel types map (Joshi et al. 2025), CC BY-NC 4.0. Because of this licence, Vigil is non-commercial.</li>
+      <li>Fire history: State of Victoria (DEECA), CC BY 4.0; NSW National Parks and Wildlife Service, CC BY; South Australia Department for Environment and Water, CC BY.</li>
+      <li>State boundaries: Australian Bureau of Statistics, CC BY 4.0.</li>
+      <li>Basemap: <a href="https://openfreemap.org">OpenFreeMap</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>, map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</li>
+      <li>Hillshade: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a> on AWS Open Data (Mapzen/Tilezen).</li>
+      <li>Map rendering: MapLibre GL JS. Type: Newsreader and Barlow Semi Condensed.</li>
+    </ul>
+
+    <h2>Who made it</h2>
+    <p>Vigil is a portfolio project by Rishi, a first-year data science student at RMIT University. It isn't affiliated with any fire agency.</p>
+    <p class="meta">Method references: Parks (2014), <em>International Journal of Wildland Fire</em> 23(2); Huot et al. (2022), "Next Day Wildfire Spread", <em>IEEE Transactions on Geoscience and Remote Sensing</em>; Cheney et al. (1998, 2012) for the grassland and dry eucalypt forest spread models.</p>
+  </main>
+  <script src="site.js"></script>
+</body>
+</html>

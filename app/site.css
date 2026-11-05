@@ -1,0 +1,67 @@
+/* Shared tokens, type and navigation for every page. */
+:root {
+  --land: #26292d;          /* basemap land, lifted a step */
+  --water: #0f1215;         /* darkest */
+  --ink: #d9dad6;           /* cool light grey type */
+  --ink-soft: #a3a5a2;
+  --ink-faint: #6f7275;
+  --amber: #ecb26a;         /* burning (palette C) */
+  --copper: #ba7656;        /* recent burn */
+  --ash: #929496;           /* scar */
+  --halo: 0 0 10px rgba(15, 18, 21, 0.95), 0 0 2px rgba(15, 18, 21, 0.9);
+  --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --sans: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--water); color: var(--ink); }
+body { font: 16px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 2px; }
+
+.wordmark {
+  font: italic 400 22px/1 var(--serif);
+  letter-spacing: 0.01em;
+  margin: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+#site-nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 0; padding: 0; }
+#site-nav a {
+  font: 500 15px/1.2 var(--sans);
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+}
+#site-nav a:hover { color: var(--ink); }
+#site-nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink-soft); }
+#site-nav a.unbuilt { color: var(--ink-faint); }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+
+/* Text pages (About, placeholders): a quiet column on the land tone. */
+.page { min-height: 100vh; background: var(--land); }
+.page header { padding: 28px 32px 0; }
+.page main { max-width: 64ch; padding: 56px 32px 96px; }
+.page h1 { font: 400 46px/1.08 var(--serif); letter-spacing: -0.01em; margin: 0 0 18px; }
+.page h2 { font: 500 24px/1.2 var(--serif); margin: 44px 0 10px; }
+.page p, .page li { font: 400 18px/1.6 var(--serif); color: var(--ink); }
+.page .lead { font-size: 21px; color: var(--ink); }
+.page .placeholder { font: 400 21px/1.5 var(--serif); color: var(--ink-soft); }
+.page ul { padding-left: 1.1em; }
+.page li { margin: 6px 0; }
+.page .safety {
+  font: 500 19px/1.5 var(--serif);
+  padding-left: 16px;
+  border-left: 2px solid var(--amber);      /* the one flagged statement on the site */
+}
+.page small, .page .meta { font: 400 15px/1.5 var(--sans); color: var(--ink-soft); }
+.page a { text-decoration-color: var(--ink-faint); text-underline-offset: 3px; }
+.page a:hover { text-decoration-color: var(--ink); }
