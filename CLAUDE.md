@@ -142,18 +142,22 @@ Download scripts are in `src/vigil/data/`; settings are in `src/vigil/config.py`
 
 - 2026-11-06: **Main model = U-Net, no raw weather channels, + physics channel** (Rishi). Weather reaches the network only through the physics arrival-time channel. Why: best on every headline metric in CV (F1 0.310 vs 0.276 plain U-Net, PR-AUC 0.238 vs 0.197, only model tied for best in the 6–24 km band), +0.034 F1 paired over the plain U-Net, about 5× the seed sd. The wind-flip test explains it: rotating the wind 180° at scoring didn't hurt the plain U-Net (F1 +0.010), so the network never learnt wind direction from the raw maps with ~2k windows, and the raw weather channels only add noise to overfit (with physics present, removing them goes 0.285 → 0.310). Defensible story: the network corrects physics instead of relearning wind. Caveats: better in 4 of 5 folds only, so a sign test alone gives p ≈ 0.19 (5 folds can't give more); fold 3 (2016+2018+2024, mostly grass and small fires) goes the other way (0.148 vs 0.162), where physics is weakest; per-fold settings were tuned for the plain U-Net, so it's re-tuned for this variant before test (`unet_tune2.py`). Website consequence: what-if weather enters via a live physics run.
 
-## Test protocol (DRAFT, awaiting Rishi's approval; nothing has touched test)
-Run once (`python -m vigil.test_eval`, to be written; refuses to run if `docs/results/test_results.csv` exists), committed and reported whatever the result. No change to models, settings or thresholds after seeing it.
+## Test protocol (approved by Rishi 2026-11-06; nothing has touched test yet)
+Run once (`python -m vigil.test_eval`; refuses to run if `docs/results/test_results.csv` exists), committed and reported whatever the result. No change to models, settings or thresholds after seeing it.
 - **Models:** (1) main: U-Net no weather + physics; (2) plain U-Net; (3) U-Net + physics; (4) best baseline: wind-shifted persistence from active fire; (5) physics alone.
-- **Training:** U-Nets on all 12 non-test seasons, 3 seeds each, reported as mean ± seed sd. Settings come from CV only:
-  - fire weight / no-burn rate: the setting chosen in most of the 5 folds (tie → best mean inner-val F1);
-  - epochs: no inner-val fold is left for early stopping, so a fixed count = median of the CV early-stopped epochs;
-  - threshold: median of the 5 CV-chosen thresholds;
+- **Training:** U-Nets on all 12 non-test seasons (all cached CV windows), 3 seeds each, reported as mean ± seed sd. Settings come from CV only:
+  - fire weight / no-burn rate: the modal per-fold CV choice; tie → best mean CV F1;
+  - epochs: fixed = median CV early-stop epoch (no inner-val fold is left for early stopping). Early-stop epoch = epochs run − patience (6); runs that hit the 30-epoch cap count as 30 (an upper bound; their best lies in 25–30). Median over the 15 CV runs (5 folds × 3 seeds) of that model;
+  - threshold: median of the 15 CV thresholds (each chosen on its inner-val fold);
   - normalisation: the "all" stats in `norm_stats.json`.
-  Baseline smear and physics ROS scale: the CV-chosen values (most common across folds). Physics channel at scale 1, already computed for 2020.
-- **Data:** season 2020, the same windows, masks and scoring as CV (whole fires, edge mask, already-burnt cells excluded, far cells kept and scored in the >24 km band).
-- **Metrics:** F1 (headline), IoU, precision, recall, PR-AUC, pooled over all test fire-days; F1/recall by distance band (≤6, 6–24, >24 km); F1/precision/recall by fuel group (forest/woodland, shrub/heath, grass/crop; a cell's group = its dominant fuel); 95% bootstrap CIs by resampling fires (44 events). Also each fire separately, for the website.
+  Baseline: modal CV variant and cutoff (wind smear 0.25 cells per m/s, 0.38 km). Physics alone: modal CV ROS scale, predicted = reached within 24 h; physics CV is rerun on the fixed data first (`physics.cv`), since its CV numbers predate the edge mask. Physics channel at scale 1, already computed for 2020.
+- **Data:** season 2020, the same windows, masks and scoring as CV (whole fires + 24 km margin, edge mask, already-burnt cells excluded, far cells kept and scored in the >24 km band).
+- **Metrics:** F1 (headline), IoU, precision, recall, PR-AUC, pooled over all test fire-days; F1/recall by distance band (≤6, 6–24, >24 km); F1/precision/recall by fuel group (a cell's dominant fuel: forest/woodland incl. plantation; shrub/heath; grass/crop; other = wetland/urban/non-burnable); each fire separately (for the website).
+- **Uncertainty:** 95% bootstrap CIs by resampling test fires (2,000 resamples, seed-mean metrics per resample). Paired bootstrap (same resampled fires for both models) for main − plain U-Net and main − best baseline, F1 and PR-AUC, with 95% CIs on the difference and the share of resamples > 0.
+- **CV alongside:** every test number is reported next to the same model's CV score (mean over folds), and the differences next to their CV differences.
+- **Check before running:** the new scorer reproduces recorded CV scores exactly on fold 0 (U-Net F1 0.3470, U-Net + physics 0.3735, baseline 0.2729), and a dry run (`--dry-run 0`) exercises the whole script on 3 CV fires.
 - **Expectation, written in advance:** 2020 is more extreme than any training season (5.8% of new burn > 24 km vs 0.5% in train), so absolute scores may fall below CV; the comparison between models is the main result.
+- **Run order (`data/processed/logs/test_chain.sh`):** tuning finishes → physics CV → dry run incl. physics → test, strictly one after another, stopping at the first failure.
 
 ## Website design notes
 From Rishi's feedback on the first East Gippsland animation (2026-11-05):
