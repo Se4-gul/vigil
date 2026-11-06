@@ -55,6 +55,21 @@ def log(msg):
     print(f"[{time.strftime('%H:%M')}] {msg}", flush=True)
 
 
+def memory() -> str:
+    """Process RSS and MPS memory, for diagnosing slowdowns or freezes."""
+    import resource
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**30  # macOS: bytes
+    mps = torch.mps.driver_allocated_memory() / 2**30 if torch.backends.mps.is_available() else 0
+    return f"peak RSS {rss:.1f} GB, MPS {mps:.1f} GB"
+
+
+def done_runs() -> set:
+    if not RESULTS.exists():
+        return set()
+    r = pd.read_csv(RESULTS)
+    return set(zip(r.model, r.fold, r.seed))
+
+
 def append(path, row: dict, columns=None):
     df = pd.DataFrame([row])
     if columns:
@@ -80,7 +95,7 @@ def fit_and_score(data, fold, name, step, seed, fw, rate, physics=False, drop=()
            **{f"heldout_{k}": v for k, v in metrics_from_counts(pt, nt, thr).items()}}
     append(RESULTS, row, COLUMNS)
     log(f"{step} {name} seed {seed} fold {fold}: held-out F1 {row['heldout_F1']:.3f} "
-        f"({row['minutes']} min, {len(hist)} epochs)")
+        f"({row['minutes']} min, {len(hist)} epochs; {memory()})")
     return row, model, stats, keep, thr
 
 
@@ -202,6 +217,7 @@ def main(steps):
     chosen = {int(k): v for k, v in json.loads(CHOSEN.read_text()).items()}
     data = Data()
     folds = sorted(CV_FOLDS)
+    done = done_runs()
     for step in steps:
         if step == "C":
             continue
@@ -210,6 +226,8 @@ def main(steps):
             wait_for_physics()
         for seed in (0, 1, 2):
             for f in folds:
+                if (name, f, seed) in done:  # resume: finished runs are skipped
+                    continue
                 row, model, stats, keep, thr = fit_and_score(data, f, name, step, seed, *chosen[f], **kw)
                 if seed == 0 and "C" in steps and step in ("A", "B"):
                     sensitivity(data, name, f, model, stats, keep, kw.get("physics", False), thr, row)
