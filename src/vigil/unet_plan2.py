@@ -77,14 +77,15 @@ def append(path, row: dict, columns=None):
     df.to_csv(path, mode="a", header=not path.exists(), index=False)
 
 
-def fit_and_score(data, fold, name, step, seed, fw, rate, physics=False, drop=(), align=False):
+def fit_and_score(data, fold, name, step, seed, fw, rate, physics=False, drop=(), align=False,
+                  results=RESULTS, tag_extra=""):
     t0 = time.time()
     model, stats, keep, inner_val, hist = train(fold, physics=physics, drop=drop, fire_weight=fw,
                                                 no_burn_rate=rate, seed=seed, align=align)
     pv, nv = score_fold(model, data, inner_val, stats, keep, physics, align=align)
     thr = best_threshold(pv, nv)
     pt, nt = score_fold(model, data, fold, stats, keep, physics, align=align)
-    tag = f"{name.replace(' ', '_').replace('+', 'plus')}_f{fold}_s{seed}"
+    tag = f"{name.replace(' ', '_').replace('+', 'plus')}{tag_extra}_f{fold}_s{seed}"
     torch.save(model.state_dict(), RUNS / f"{tag}.pt")
     np.savez(RUNS / f"{tag}_counts.npz", pos=pt, neg=nt, pos_val=pv, neg_val=nv)
     row = {"step": step, "model": name, "fold": fold, "seed": seed, "fire_weight": fw,
@@ -93,7 +94,7 @@ def fit_and_score(data, fold, name, step, seed, fw, rate, physics=False, drop=()
            "inner_val_F1": metrics_from_counts(pv, nv, thr)["F1"],
            "minutes": round((time.time() - t0) / 60, 1),
            **{f"heldout_{k}": v for k, v in metrics_from_counts(pt, nt, thr).items()}}
-    append(RESULTS, row, COLUMNS)
+    append(results, row, COLUMNS)
     log(f"{step} {name} seed {seed} fold {fold}: held-out F1 {row['heldout_F1']:.3f} "
         f"({row['minutes']} min, {len(hist)} epochs; {memory()})")
     return row, model, stats, keep, thr
