@@ -2,7 +2,7 @@
 
 Version 1.0. Follows the outline of Gebru et al., "Datasheets for Datasets" (2021).
 
-**Cite as:** Kurra, R. (2026). Vigil daily burn-day labels, Victoria 2012–13 to 2024–25 (v1.0). Zenodo. DOI: [placeholder]
+**Cite as:** Kurra, R. (2026). Vigil daily burn-day labels, Victoria 2012–13 to 2024–25 (v1.0). Zenodo. DOI: [10.5281/zenodo.24049740](https://doi.org/10.5281/zenodo.24049740)
 
 ## Motivation
 

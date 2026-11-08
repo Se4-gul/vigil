@@ -26,6 +26,7 @@ from vigil.config import CV_FOLDS, GRID_CRS, PROCESSED, ROOT, TEST_SEASONS
 
 OUT = ROOT / "release"
 VERSION = "1.0"
+DOI = "https://doi.org/10.5281/zenodo.24049740"
 EPOCH = "2000-01-01"
 FILL = -1
 CELL_HA = 0.375 ** 2 * 100            # 14.0625 ha per 375 m cell
@@ -85,6 +86,7 @@ def season_file(lab, season, transform):
             "Conventions": "CF-1.8",
             "license": "CC-BY-4.0",
             "version": VERSION,
+            "doi": DOI,
             "creator_name": "Rishwanth Kurra",
             "source": "NASA FIRMS VIIRS S-NPP 375 m (SP); NASA MODIS MCD64A1 C6.1; DEECA Victoria fire history "
                       "(event tagging only)",

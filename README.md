@@ -4,6 +4,8 @@ Predicting where a bushfire in Victoria will burn tomorrow, from where it's burn
 
 **Live site: https://vigil-c5o.pages.dev**
 
+**Dataset:** the daily fire labels are published on Zenodo, [doi:10.5281/zenodo.24049740](https://doi.org/10.5281/zenodo.24049740) (CC BY 4.0; see [release/](release/)).
+
 ![The East Gippsland fire on 31 December 2019: what burnt that day (white outline) and the main model's guess from the day before (amber)](app/img/home_east_gippsland_2019-12-31.jpg)
 
 ## Result

@@ -52,6 +52,9 @@
     <p>Vigil compares simple baselines (assume the fire keeps growing from where it's burning, optionally pushed downwind), a physics model built on the CSIRO fire-spread equations for forest, grassland and heath, and neural networks (U-Nets) trained on past fires. Each one predicts the next day's newly burnt area. Models were chosen and tuned on twelve other fire seasons, and the 2019–20 Black Summer season was held back and tested once, at the end.</p>
     <p>The main model is a U-Net that is given the physics model's prediction as one of its inputs, but not the raw weather. On its own the network didn't learn much from the weather maps, and the physics prediction already carries the wind. On the 2019–20 fires, it caught about 4 in 10 of the cells that burnt the next day, against about 2 in 10 for the best simple rule, with about a third of its guesses right for both. The physics model alone does poorly, because it assumes every fire keeps running freely for a full day. No model predicts long jumps of more than 6 km well, and grass fires are the hardest.</p>
 
+    <h2>The dataset</h2>
+    <p>The daily fire maps behind Vigil are published as an open dataset under CC BY 4.0: <a href="https://doi.org/10.5281/zenodo.24049740">doi:10.5281/zenodo.24049740</a>.</p>
+
     <h2>Data and credits</h2>
     <ul>
       <li>Active fire detections: NASA FIRMS, VIIRS 375 m (S-NPP and NOAA-20), NASA LANCE.</li>

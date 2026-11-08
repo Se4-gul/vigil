@@ -2,7 +2,7 @@
 
 Day-by-day burnt area of 441 bushfires in Victoria (and edges of NSW and SA), fire seasons 2012–13 to 2024–25, on a 375 m grid. Built from NASA VIIRS fire detections and MODIS burned area to train and test next-day fire-spread models.
 
-Licence: CC BY 4.0. Read [DATASHEET.md](DATASHEET.md) before using it: it covers how the labels were made, what they miss, and the flags.
+DOI: [10.5281/zenodo.24049740](https://doi.org/10.5281/zenodo.24049740). Licence: CC BY 4.0. Read [DATASHEET.md](DATASHEET.md) before using it: it covers how the labels were made, what they miss, and the flags.
 
 ## Files
 
@@ -29,7 +29,7 @@ From the repository (https://github.com/Se4-gul/vigil), after running the pipeli
 
 ## Cite
 
-Kurra, R. (2026). Vigil daily burn-day labels, Victoria 2012–13 to 2024–25 (version 1.0) [Data set]. Licence CC BY 4.0.
+Kurra, R. (2026). Vigil daily burn-day labels, Victoria 2012–13 to 2024–25 (v1.0). Zenodo. https://doi.org/10.5281/zenodo.24049740
 Please also cite the sources listed in the datasheet, and Parks (2014) for the method.
 
 Not for safety decisions. For current fires, see VicEmergency (https://emergency.vic.gov.au).
