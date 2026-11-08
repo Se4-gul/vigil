@@ -2,7 +2,7 @@
 name = "vigil"
 version = "0.1.0"
 description = "Bushfire spread prediction for Victoria"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 
 [build-system]
 requires = ["setuptools>=61"]

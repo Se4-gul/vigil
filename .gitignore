@@ -9,8 +9,20 @@ __pycache__/
 *.egg-info/
 *.tmp
 .env
+.env*
 .netrc
+.cdsapirc
 
 # Rendered animations (regenerate with python -m vigil.viz animate)
 docs/figures/*.mp4
 docs/figures/*.gif
+
+# Logs, model weights, editors
+*.log
+*.pt
+*.pth
+.vscode/
+.idea/
+
+# Local Claude Code instructions (how we work; not part of the project)
+CLAUDE.local.md
