@@ -7,17 +7,74 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="compare.css?v=2">
 </head>
-<body class="page">
-  <header>
+<body class="replay compare">
+  <div id="map" aria-label="Map of the selected fire: prediction against what burnt"></div>
+
+  <header class="top">
     <a class="wordmark" href="index.html">Vigil</a>
     <nav id="site-nav" aria-label="Pages"></nav>
+
+    <div class="fire">
+      <button id="fire-name" class="fire-name" aria-haspopup="listbox" aria-expanded="false">
+        <span id="fire-label">Loading fires</span><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+      <div id="fire-list" class="fire-list" role="listbox" aria-label="Choose a fire" hidden></div>
+      <p id="fire-kind" class="fire-range"></p>
+    </div>
+
+    <div class="models" role="radiogroup" aria-label="Model">
+      <div id="model-list" class="model-list"></div>
+      <label class="prob-toggle"><input type="checkbox" id="prob"> Show the main model's probability</label>
+    </div>
   </header>
-  <main>
-    <h1>Compare</h1>
-    <p class="placeholder">Each day of a real fire next to what the physics model, the U-Net and the hybrid predicted for it. Not built yet.</p>
-  </main>
+
+  <section class="readout" aria-live="polite">
+    <p id="date" class="date">–</p>
+    <p id="stat" class="stat"></p>
+    <p class="key" id="key-classes">
+      <span><i class="sw hit"></i>hit</span>
+      <span><i class="sw missed"></i>missed</span>
+      <span><i class="sw false"></i>false alarm</span>
+      <span><i class="sw ash"></i>burnt earlier</span>
+      <span><i class="sw unscored"></i>not scored</span>
+    </p>
+    <p class="key" id="key-prob" hidden>
+      <span><i class="sw ramp"></i>probability of burning, low to high</span>
+      <span><i class="sw outline"></i>what burnt</span>
+      <span><i class="sw ash"></i>burnt earlier</span>
+      <span><i class="sw unscored"></i>not scored</span>
+    </p>
+    <p id="explain" class="explain">A hit burnt where the model said it would. A miss burnt without warning. A false alarm was predicted but didn't burn.</p>
+  </section>
+
+  <section class="timeline" aria-label="Day">
+    <button id="play" class="play" aria-label="Play">
+      <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>
+    </button>
+    <div class="track">
+      <canvas id="bars" aria-hidden="true"></canvas>
+      <input id="slider" type="range" min="0" max="1" step="1" value="0" aria-label="Predicted day">
+      <p id="hover" class="hover" hidden></p>
+    </div>
+    <p class="strip-labels" aria-hidden="true"><span>new burn</span><span>F1 by day</span></p>
+  </section>
+
+  <p class="attribution">
+    Basemap <a href="https://openfreemap.org">OpenFreeMap</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>,
+    © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.
+    Terrain <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>.
+    Fire data from NASA and the Bureau of Meteorology; full credits on <a href="about.html">About</a>.
+  </p>
+
   <script src="site.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="basemap.js?v=2"></script>
+  <script src="compare.js?v=2"></script>
 </body>
 </html>

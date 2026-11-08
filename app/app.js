@@ -31,44 +31,8 @@ const GLOW = [255, 196, 120];
 const DAYS_PER_SECOND = 2.2;
 const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Basemap: OpenFreeMap "dark" (vector tiles, free, no API key), lifted a step:
-// water darkest, land a notch lighter, roads and labels dimmed.
-const map = new maplibregl.Map({
-  container: "map",
-  attributionControl: { compact: true },
-  style: "https://tiles.openfreemap.org/styles/dark",
-  center: [148.6, -37.3], zoom: 7, maxZoom: 12,
-});
-map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
-
 let firstLabelLayer;
-map.on("style.load", () => {
-  const set = (id, prop, v) => map.getLayer(id) && map.setPaintProperty(id, prop, v);
-  set("background", "background-color", "#26292d");
-  set("water", "fill-color", "#0f1215");
-  set("waterway", "line-color", "#0f1215");
-  for (const id of ["landcover_wood", "landuse_park"]) set(id, "fill-color", "#2a2d31");
-  set("landuse_residential", "fill-color", "#2c2f33");
-  for (const layer of map.getStyle().layers) {
-    if (layer.type === "symbol" && !firstLabelLayer) firstLabelLayer = layer.id;
-    if (layer.type === "line" && layer["source-layer"] === "transportation") set(layer.id, "line-opacity", 0.4);
-    if (layer.type === "line" && layer["source-layer"] === "boundary") set(layer.id, "line-opacity", 0.55);
-    if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) set(layer.id, "text-opacity", 0.5);
-  }
-  // Very subtle hillshade: AWS Terrain Tiles (Terrarium; free, no key). The
-  // virtual-host URL is the one that sends CORS headers.
-  map.addSource("dem", {
-    type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: 12,
-    tiles: ["https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png"],
-    attribution: 'Terrain: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles (AWS Open Data, Mapzen/Tilezen)</a>',
-  });
-  const firstLine = map.getStyle().layers.find(l => l.type === "line").id;
-  map.addLayer({ id: "hillshade", type: "hillshade", source: "dem",
-                 paint: { "hillshade-exaggeration": 0.32, "hillshade-shadow-color": "#0b0d0f",
-                          "hillshade-highlight-color": "#4c4f54", "hillshade-accent-color": "#0b0d0f" } },
-               firstLine);
-  init();
-});
+const map = makeBasemap((m, label) => { firstLabelLayer = label; init(); });
 
 const $ = id => document.getElementById(id);
 const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
@@ -198,19 +162,6 @@ async function loadFire(i, { animateView = true } = {}) {
   $("slider").max = fire.days;
   t = 0;
   render();
-}
-
-// The clear part of the map: below the title block and above the date and
-// timeline, measured from the layout so the fire never sits under the text.
-function clearArea() {
-  const vh = innerHeight, vw = innerWidth, gap = 24;
-  const top = document.querySelector(".top").getBoundingClientRect().bottom + gap;
-  const bottom = vh - document.querySelector(".readout").getBoundingClientRect().top + gap;
-  const side = Math.min(80, vw * 0.06);
-  // Keep at least a third of the height for the fire on short screens.
-  const spare = vh - top - bottom;
-  const shrink = spare < vh / 3 ? (vh / 3 - spare) / 2 : 0;
-  return { top: Math.max(top - shrink, 10), bottom: Math.max(bottom - shrink, 10), left: side, right: side };
 }
 
 // Fire picker: the fire's name is the control; it opens a plain list.
