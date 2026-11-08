@@ -2,12 +2,13 @@
 // no API key), lifted a step (water darkest, land a notch lighter, roads and
 // labels dimmed), with a very subtle AWS Terrarium hillshade. Calls onReady(map,
 // firstLabelLayer) once the style is loaded; fire layers go under the labels.
-function makeBasemap(onReady, view = { center: [148.6, -37.3], zoom: 7 }) {
+function makeBasemap(onReady, view = { center: [148.6, -37.3], zoom: 7 },
+                     { container = "map", scale = true, attribution = true } = {}) {
   const map = new maplibregl.Map({
-    container: "map", attributionControl: { compact: true },
+    container, attributionControl: attribution ? { compact: true } : false,
     style: "https://tiles.openfreemap.org/styles/dark", maxZoom: 12, ...view,
   });
-  map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
+  if (scale) map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
   map.on("style.load", () => {
     let firstLabelLayer;
     const set = (id, prop, v) => map.getLayer(id) && map.setPaintProperty(id, prop, v);

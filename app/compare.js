@@ -1,46 +1,67 @@
-// Vigil · Compare. For a fire and a day, what each model predicted for the
-// next day against what actually burnt. Every prediction is out of sample:
-// test fires by the final models, other seasons by the fold model that never
+// Vigil · Compare. Each day the model sees where the fire is and guesses where
+// it will burn tomorrow. Two synced maps: the main model against a comparison
+// (the best simple rule by default). Every prediction is out of sample: test
+// fires by the final models, other seasons by the fold model that never
 // trained on that season. Data: app/data/compare/ (python -m vigil.compare_export).
 // Each fire-day is one RGB PNG: R = main model probability x 255, G = flags.
 const BIT = { pos: 1, burnt: 2, unscored: 4, main: 8, unet: 16, baseline: 32, physics: 64, outside: 128 };
-const MODEL_ORDER = ["main", "unet", "baseline", "physics"];
-const MODEL_NOTE = {
-  main: "U-Net with the physics model as an input, no raw weather",
-  unet: "U-Net with all inputs, including raw weather",
-  baseline: "Active fire pushed downwind; the best simple rule",
-  physics: "Cellular automaton with CSIRO spread models",
-};
-// Palette C. Warm = it burnt (hit amber, missed copper); the one cool colour is
-// a prediction that didn't happen. Burnt earlier is the Replay's ash scar; not
-// scored is a dark hatched veil. Checked in OKLab: the three classes stay
-// >= 13 apart under simulated colour blindness.
+const NAMES = { main: "Main model", baseline: "Simple rule", unet: "Plain U-Net", physics: "Physics model" };
+// Palette C. Simple view: what burnt is a light outline, the guess an amber
+// fill, so a right guess is fill inside the outline. Detail view: warm = it
+// burnt (hit amber, missed copper), the one cool colour = guessed but didn't
+// burn. Burnt before is the Replay's ash; not scored a hatched dark veil.
 const C = {
+  guess: [236, 178, 106, 205], outline: [240, 241, 236, 255],
   hit: [236, 178, 106, 242], missed: [186, 118, 86, 235], false: [159, 180, 196, 217],
-  ash: [146, 148, 150, 77], veil: [15, 18, 21, 150], outline: [235, 236, 232, 235],
+  ash: [146, 148, 150, 70], veil: [15, 18, 21, 150],
 };
-const STEP_SECONDS = 0.7;
+const DEFAULT = { fire: 26900, day: "2020-01-04" };   // main model clearly ahead of the simple rule
+const STEP_SECONDS = 0.8;
 const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const params = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
 
-let firstLabelLayer, meta, fires = [], fire = null, k = 0, model = "main", probMode = false;
-let playing = false, lastStep = 0, loadToken = 0;
+let meta, fires = [], fire = null, k = 0, modelB = "baseline", detail = false;
+let playing = false, lastStep = 0, loadToken = 0, ready = 0;
 const cache = new Map();
-const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d");
 const reader = document.createElement("canvas"), rctx = reader.getContext("2d", { willReadFrequently: true });
 
-const map = makeBasemap((m, label) => { firstLabelLayer = label; init(); });
+// ------------------------------------------------------------------ two synced maps
+function panel(container, model) {
+  const canvas = document.createElement("canvas");
+  const p = { canvas, ctx: canvas.getContext("2d"), model, label: null };
+  p.map = makeBasemap((m, label) => { p.label = label; if (++ready === 2) init(); },
+                      undefined, { container, scale: container === "map-b", attribution: false });
+  return p;
+}
+const A = panel("map-a", "main"), B = panel("map-b", "baseline");
+let syncing = false;
+for (const [src, dst] of [[A, B], [B, A]]) {
+  src.map.on("move", () => {
+    if (syncing) return;
+    syncing = true;
+    dst.map.jumpTo({ center: src.map.getCenter(), zoom: src.map.getZoom(), bearing: src.map.getBearing() });
+    syncing = false;
+  });
+}
 
 // ------------------------------------------------------------------ helpers
 const parseDate = s => new Date(s + "T00:00:00");
 const longDate = s => parseDate(s).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 const shortDate = s => parseDate(s).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 const dayDiff = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
-const fmt = x => x == null ? "–" : x.toFixed(2);
 const n = x => x.toLocaleString("en-AU");
 const f1Of = ([tp, fp, fn]) => tp + fp + fn === 0 ? null : 2 * tp / (2 * tp + fp + fn);
 const seasonName = s => `${s - 1}–${String(s).slice(2)}`;
+const inTen = (a, b) => { const r = a / b; return r > 0 && r < 0.05 ? "fewer than 1 in 10" : `${Math.round(10 * r)} in 10`; };
+
+// Plain language: of the cells that burnt, how many it caught; of its guesses, how many were right.
+function plain([tp, fp, fn]) {
+  if (tp + fn === 0) return fp ? `Nothing burnt this day, but it guessed ${n(fp)} cells.` : "Nothing burnt this day, and it guessed nothing.";
+  if (tp + fp === 0) return `Guessed nothing; ${n(fn)} cells burnt.`;
+  return `Caught ${inTen(tp, tp + fn)} cells that burnt; ${inTen(tp, tp + fp)} of its guesses were right.`;
+}
+const caught = ([tp, , fn]) => tp + fn ? `caught ${inTen(tp, tp + fn)}` : "nothing burnt";
 
 // ------------------------------------------------------------------ data
 async function dayPixels(f, i) {
@@ -59,109 +80,102 @@ async function dayPixels(f, i) {
   return p;
 }
 
-// ------------------------------------------------------------------ map drawing
-function paint({ w, h, px }) {
+// ------------------------------------------------------------------ drawing
+function isEdge(px, w, h, x, y) {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const xx = x + dx, yy = y + dy;
+    if (xx < 0 || yy < 0 || xx >= w || yy >= h || !(px[4 * (yy * w + xx) + 1] & BIT.pos)) return true;
+  }
+  return false;
+}
+
+function paint(P, { w, h, px }) {
+  const { canvas, ctx } = P;
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-  const out = ctx.createImageData(w, h), o = out.data, bit = BIT[model];
+  const out = ctx.createImageData(w, h), o = out.data, bit = BIT[P.model];
   const put = (i, c, a = c[3]) => { o[i] = c[0]; o[i + 1] = c[1]; o[i + 2] = c[2]; o[i + 3] = a; };
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = 4 * (y * w + x), g = px[i + 1];
       if (g & BIT.outside) continue;
       if (g & BIT.burnt) { put(i, C.ash); continue; }
-      if (g & BIT.unscored) { if ((x + y) % 4 < 2) put(i, C.veil); else put(i, C.veil, 60); continue; }
-      const pos = g & BIT.pos;
-      if (probMode) {
-        const p = px[i] / 255;
-        if (pos && isEdge(px, w, h, x, y)) { put(i, C.outline); continue; }
-        if (p > 0.02) put(i, C.hit, Math.round(235 * Math.min(1, Math.pow(p, 0.75))));
-        continue;
-      }
-      const pred = g & bit;
-      if (pos && pred) put(i, C.hit);
-      else if (pos) put(i, C.missed);
-      else if (pred) put(i, C.false);
+      if (g & BIT.unscored) { put(i, C.veil, (x + y) % 4 < 2 ? 150 : 60); continue; }
+      const pos = g & BIT.pos, pred = g & bit;
+      if (detail) {
+        if (pos && pred) put(i, C.hit); else if (pos) put(i, C.missed); else if (pred) put(i, C.false);
+      } else if (pos && isEdge(px, w, h, x, y)) put(i, C.outline);
+      else if (pred) put(i, C.guess);
     }
   }
   ctx.putImageData(out, 0, 0);
 }
 
-function isEdge(px, w, h, x, y) {
-  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const xx = x + dx, yy = y + dy;
-    if (xx < 0 || yy < 0 || xx >= w || yy >= h) return true;
-    if (!(px[4 * (yy * w + xx) + 1] & BIT.pos)) return true;
+function draw(P, day) {
+  paint(P, day);
+  let src = P.map.getSource("pred");
+  if (!src) {
+    // Not animated: the canvas only changes with the day, so repaint on demand.
+    P.map.addSource("pred", { type: "canvas", canvas: P.canvas, coordinates: fire.corners, animate: false });
+    P.map.addLayer({ id: "pred", type: "raster", source: "pred",
+                     paint: { "raster-resampling": "nearest", "raster-fade-duration": 0 } }, P.label);
+    src = P.map.getSource("pred");
   }
-  return false;
+  src.play();
+  requestAnimationFrame(() => requestAnimationFrame(() => src.pause()));
 }
 
 async function show() {
   const token = ++loadToken, f = fire, i = k;
   const day = await dayPixels(f, i);
   if (token !== loadToken) return;
-  paint(day);
-  let src = map.getSource("pred");
-  if (!src) {
-    // Not animated: the canvas only changes with the day, so repaint on demand.
-    map.addSource("pred", { type: "canvas", canvas, coordinates: f.corners, animate: false });
-    map.addLayer({ id: "pred", type: "raster", source: "pred",
-                   paint: { "raster-resampling": "nearest", "raster-fade-duration": 0 } }, firstLabelLayer);
-    src = map.getSource("pred");
-  }
-  src.play();
-  requestAnimationFrame(() => requestAnimationFrame(() => src.pause()));
+  draw(A, day);
+  draw(B, day);
   for (const j of [i + 1, i - 1]) if (j >= 0 && j < f.days.length) dayPixels(f, j);   // prefetch
   readout();
   renderBars();
 }
 
 // ------------------------------------------------------------------ text
+function scoreLine(model) {
+  const c = fire.counts[model][k], f1 = f1Of(c);
+  return plain(c) + (detail && f1 != null ? ` F1 ${f1.toFixed(2)}.` : "");
+}
+
 function readout() {
-  const date = fire.days[k], c = fire.counts[model][k], [tp, fp, fn] = c, f1 = f1Of(c);
+  const date = fire.days[k];
   $("date").textContent = longDate(date);
-  let s;
-  if (tp + fn === 0 && fp === 0) s = "No new burn this day, and none predicted.";
-  else if (tp + fn === 0) s = `No new burn this day; ${n(fp)} cells predicted that didn't burn.`;
-  else s = `F1 ${fmt(f1)} this day: ${n(tp)} cells hit, ${n(fn)} missed, ${n(fp)} false alarms.`;
-  const whole = fire.f1[model];
-  $("stat").textContent = `${s} Whole fire ${fmt(whole)}.`;
-  $("slider").setAttribute("aria-valuetext", `${longDate(date)}. ${s}`);
+  $("score-a").textContent = scoreLine("main");
+  $("score-b").textContent = scoreLine(modelB);
   $("slider").value = dayDiff(fire.days[0], date);
+  $("slider").setAttribute("aria-valuetext",
+    `${longDate(date)}. Main model: ${scoreLine("main")} ${NAMES[modelB]}: ${scoreLine(modelB)}`);
 }
 
 function kindLine(f) {
-  if (f.kind === "test")
-    return `${seasonName(f.season)} test fire, predicted by models that never saw this season. ` +
-           "Whole-fire scores average three training runs; the map shows one.";
-  return `${seasonName(f.season)} fire, predicted by a model trained without this season.`;
+  return f.kind === "test"
+    ? `A ${seasonName(f.season)} fire, kept out of training to test the models.`
+    : `A ${seasonName(f.season)} fire, predicted by models trained without that season.`;
 }
 
-// ------------------------------------------------------------------ timeline: new burn above, F1 below
+// ------------------------------------------------------------------ timeline: one bar per day of new burn
 const bars = $("bars"), bctx = bars.getContext("2d");
 function renderBars() {
   const dpr = devicePixelRatio || 1, w = bars.clientWidth, h = bars.clientHeight;
   if (bars.width !== Math.round(w * dpr)) { bars.width = Math.round(w * dpr); bars.height = Math.round(h * dpr); }
   bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   bctx.clearRect(0, 0, w, h);
-  const span = dayDiff(fire.days[0], fire.days.at(-1)) + 1, bw = w / span;
-  const topBase = 30, f1Top = 36, f1Base = h - 2, max = Math.max(...fire.new_burn, 1);
+  const span = dayDiff(fire.days[0], fire.days.at(-1)) + 1, bw = w / span, base = h - 6;
+  const max = Math.max(...fire.new_burn, 1);
   bctx.fillStyle = "rgba(217, 218, 214, 0.18)";
-  bctx.fillRect(0, topBase, w, 1);
-  bctx.fillRect(0, f1Base, w, 1);
+  bctx.fillRect(0, base, w, 1);
   fire.days.forEach((d, i) => {
-    const x = dayDiff(fire.days[0], d) * bw, cur = i === k;
-    const v = fire.new_burn[i], bh = Math.max(v > 0 ? 1.5 : 0, (v / max) * (topBase - 3));
-    bctx.fillStyle = cur ? "rgba(236, 178, 106, 0.95)" : "rgba(146, 148, 150, 0.55)";
-    bctx.fillRect(x + 0.5, topBase - bh, Math.max(bw - 1, 1), bh);
-    const f1 = f1Of(fire.counts[model][i]);
-    if (f1 == null) return;                                  // no new burn, nothing predicted
-    const fh = Math.max(1, f1 * (f1Base - f1Top));
-    bctx.fillStyle = cur ? "rgba(236, 178, 106, 1)" : "rgba(236, 178, 106, 0.55)";
-    bctx.fillRect(x + 0.5, f1Base - fh, Math.max(bw - 1, 1), fh);
+    const v = fire.new_burn[i], bh = Math.max(v > 0 ? 1.5 : 0, (v / max) * (base - 4));
+    bctx.fillStyle = i === k ? "rgba(236, 178, 106, 1)" : "rgba(146, 148, 150, 0.6)";
+    bctx.fillRect(dayDiff(fire.days[0], d) * bw + 0.5, base - bh, Math.max(bw - 1, 1), bh);
   });
-  const x = (dayDiff(fire.days[0], fire.days[k]) + 0.5) * bw;   // playhead
+  const x = (dayDiff(fire.days[0], fire.days[k]) + 0.5) * bw;
   bctx.fillStyle = "#d9dad6";
-  bctx.fillRect(Math.round(x) - 0.5, 0, 1, h);
+  bctx.fillRect(Math.round(x) - 0.5, 0, 1, base);
 }
 
 function nearestIndex(offset) {
@@ -173,34 +187,24 @@ function nearestIndex(offset) {
 function hover(e) {
   const r = bars.getBoundingClientRect(), span = dayDiff(fire.days[0], fire.days.at(-1)) + 1;
   const i = nearestIndex(Math.floor((e.clientX - r.left) / r.width * span));
-  const c = fire.counts[model][i], f1 = f1Of(c), tip = $("hover");
-  tip.textContent = `${shortDate(fire.days[i])}: ${f1 == null ? "no new burn" : "F1 " + fmt(f1)}, ` +
-                    `${n(fire.new_burn[i])} cells burnt`;
+  const a = fire.counts.main[i], b = fire.counts[modelB][i], fa = f1Of(a), fb = f1Of(b), tip = $("hover");
+  tip.textContent = `${shortDate(fire.days[i])}: main model ${caught(a)}, ${NAMES[modelB].toLowerCase()} ${caught(b)}` +
+                    (fa != null ? ` (F1 ${fa.toFixed(2)} vs ${(fb ?? 0).toFixed(2)})` : "");
   tip.hidden = false;
   const x = (dayDiff(fire.days[0], fire.days[i]) + 0.5) / span * r.width;
-  tip.style.left = `${Math.min(Math.max(x, 60), r.width - 60)}px`;
+  tip.style.left = `${Math.min(Math.max(x, 170), r.width - 170)}px`;
 }
 
 // ------------------------------------------------------------------ controls
 function setDay(i) { k = Math.max(0, Math.min(i, fire.days.length - 1)); show(); }
 
-function setModel(m) {
-  model = m;
-  if (m !== "main") setProb(false);
-  $("prob").disabled = m !== "main";
-  for (const b of $("model-list").children) b.setAttribute("aria-checked", b.dataset.m === m);
-  buildList();
-  show();
-}
-
-function setProb(p) {
-  probMode = p;
-  $("prob").checked = p;
-  $("key-classes").hidden = p;
-  $("key-prob").hidden = !p;
-  $("explain").textContent = p
-    ? "Brighter amber means the main model gave that cell a higher chance of burning the next day. The light outline is what actually burnt."
-    : "A hit burnt where the model said it would. A miss burnt without warning. A false alarm was predicted but didn't burn.";
+function setDetail(d) {
+  detail = d;
+  $("detail").checked = d;
+  $("key-simple").hidden = d;
+  $("key-detail").hidden = !d;
+  $("hint").textContent = d ? "Scores add F1, which balances the two: 1 is perfect, 0 is no overlap."
+                            : "Where the fill sits inside the outline, the guess was right.";
 }
 
 function setPlaying(p) {
@@ -219,51 +223,45 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
+const fit = () => {
+  const pad = { top: 56, bottom: 64, left: 24, right: 24 };      // clear of the name and the score
+  A.map.fitBounds(fire.focus, { padding: pad, duration: 0, maxZoom: 10.5 });
+};
+
 async function loadFire(i, day) {
   fire = fires[i];
   cache.clear();
-  if (map.getSource("pred")) { map.removeLayer("pred"); map.removeSource("pred"); }
+  for (const P of [A, B]) if (P.map.getSource("pred")) { P.map.removeLayer("pred"); P.map.removeSource("pred"); }
   $("fire-label").textContent = fire.label;
   $("fire-kind").textContent = kindLine(fire);
   $("slider").max = dayDiff(fire.days[0], fire.days.at(-1));
   buildList();
-  // Default day: the fire's biggest run, so the page opens on something to compare.
   k = day ?? fire.new_burn.indexOf(Math.max(...fire.new_burn));
+  fit();                                    // fixed framing per fire: what burnt, both maps
   await show();
-  await document.fonts.ready;      // frame after the text is set: its width decides where the fire goes
-  fit();
 }
 
-const fit = () => map.fitBounds(fire.focus, { padding: framing(), duration: 0, maxZoom: 10.5 });  // what burnt
-
-// On wide screens the text column owns the left side, so the fire goes in the
-// space to its right; on narrow ones, between the title block and the readout.
-function framing() {
-  const vw = innerWidth, vh = innerHeight;
-  const textRight = Math.max(...[".top", ".readout"].map(s => document.querySelector(s).getBoundingClientRect().right));
-  if (vw - textRight > 420) {
-    const bottom = vh - document.querySelector(".timeline").getBoundingClientRect().top + 40;
-    return { left: textRight + 40, right: 60, top: 60, bottom };
-  }
-  return clearArea();
-}
+// Picker: fires with a single scored day are left out (they're still in the scores).
+const listed = f => !(f.kind === "test" && f.days.length === 1);
 
 function buildList() {
   const box = $("fire-list");
   box.textContent = "";
-  for (const [kind, title] of [["test", "2019–20 test fires"], ["cv", "Other seasons, each held out of training"]]) {
+  for (const [kind, title] of [["test", "Test fires, 2019–20"], ["cv", "Other seasons"]]) {
     const h = document.createElement("p");
     h.className = "group";
     h.textContent = title;
     box.appendChild(h);
     fires.forEach((f, i) => {
-      if (f.kind !== kind) return;
+      if (f.kind !== kind || !listed(f)) return;
       const b = document.createElement("button");
       b.setAttribute("role", "option");
       b.setAttribute("aria-selected", f === fire);
       const when = parseDate(f.days[0]).toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+      const tot = [0, 1, 2].map(j => f.counts.main.reduce((s, c) => s + c[j], 0));
       b.innerHTML = `<span>${f.label}</span><span class="when">${when}</span>` +
-                    `<span class="score">F1 ${fmt(f.f1[model])}</span>`;
+                    `<span class="score-small">${caught(tot)}</span>`;
+      b.title = `Main model over the whole fire: ${plain(tot)}`;
       b.onclick = () => { openList(false); setPlaying(false); loadFire(i); $("fire-name").focus(); };
       box.appendChild(b);
     });
@@ -276,36 +274,25 @@ function openList(open) {
   if (open) $("fire-list").querySelector('[aria-selected="true"]')?.focus();
 }
 
-function buildModels() {
-  const box = $("model-list");
-  for (const m of MODEL_ORDER) {
-    const b = document.createElement("button");
-    b.dataset.m = m;
-    b.setAttribute("role", "radio");
-    b.title = MODEL_NOTE[m];
-    b.textContent = meta.models[m];
-    b.onclick = () => setModel(m);
-    box.appendChild(b);
-  }
-}
-
 async function init() {
   meta = await (await fetch("data/compare/fires.json")).json();
   fires = meta.fires;
-  buildModels();
-  const pick = Math.max(0, fires.findIndex(f => String(f.id) === params.get("fire")));
-  if (MODEL_ORDER.includes(params.get("model"))) model = params.get("model");
-  setModel(model);
-  setProb(params.get("prob") === "1" && model === "main");
-  const f = fires[pick];
-  const day = params.has("day") ? f.days.indexOf(params.get("day")) : -1;
+  if (["baseline", "unet", "physics"].includes(params.get("vs"))) modelB = params.get("vs");
+  B.model = modelB;
+  $("model-b").value = modelB;
+  setDetail(params.get("detail") === "1");
+  const id = params.get("fire") ?? String(DEFAULT.fire);
+  const pick = Math.max(0, fires.findIndex(f => String(f.id) === id));
+  const wantDay = params.get("day") ?? (id === String(DEFAULT.fire) ? DEFAULT.day : null);
+  const day = wantDay ? fires[pick].days.indexOf(wantDay) : -1;
   await loadFire(pick, day >= 0 ? day : undefined);
   requestAnimationFrame(frame);
 }
 
 $("fire-name").onclick = () => openList($("fire-list").hidden);
 document.addEventListener("click", e => { if (!e.target.closest(".fire")) openList(false); });
-$("prob").onchange = e => { setProb(e.target.checked); show(); };
+$("detail").onchange = e => { setDetail(e.target.checked); show(); };
+$("model-b").onchange = e => { modelB = B.model = e.target.value; show(); };
 $("play").onclick = () => setPlaying(!playing);
 $("slider").oninput = e => setDay(nearestIndex(+e.target.value));
 const track = document.querySelector(".track");

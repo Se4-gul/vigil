@@ -1,66 +1,147 @@
-/* Compare page: Replay's layout, plus the model switcher, a class key and a
-   two-strip timeline (new burn above, F1 by day below). */
-.compare .fire-range { max-width: 46ch; }
-
-.models { margin-top: 18px; }
-.model-list { display: flex; flex-wrap: wrap; gap: 4px 18px; }
-.model-list button {
-  background: none; border: 0; padding: 0 0 2px; cursor: pointer;
-  font: 500 17px/1.3 var(--sans); color: var(--ink-soft); text-shadow: var(--halo);
-  border-bottom: 1px solid transparent;
+/* Compare page: a quiet text column on the left, two synced maps on the right
+   (main model and its comparison), one shared timeline underneath. Type sits
+   directly on the maps, as on Replay; no boxes. */
+html, body.compare { height: 100%; }
+body.compare {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(320px, 400px) 1fr;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  background: var(--water);
 }
-.model-list button:hover { color: var(--ink); }
-.model-list button[aria-checked="true"] { color: var(--ink); border-bottom-color: var(--amber); }
-.prob-toggle {
-  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
-  font: 400 15px/1.3 var(--sans); color: var(--ink-soft); cursor: pointer;
-}
-.prob-toggle input { accent-color: var(--amber); margin: 0; }
-.prob-toggle:has(input:disabled) { color: var(--ink-faint); cursor: default; }
 
-/* Fire list: two groups, each fire with its F1 for the selected model. */
-.compare .fire-list { max-height: min(60vh, 520px); overflow-y: auto; min-width: 380px; }
-.fire-list .group { margin: 10px 14px 4px; font: 500 14px/1.3 var(--sans); color: var(--ink-faint); }
+/* ---------------------------------------------------------------- text column */
+.side { grid-row: 1; grid-column: 1; padding: 26px 26px 12px 30px; overflow-y: auto; }
+.side .lead { margin: 30px 0 0; font: 400 21px/1.35 var(--serif); color: var(--ink); max-width: 26ch; }
+
+.fire { margin-top: 28px; position: relative; }
+.fire-name {
+  display: inline-flex; align-items: baseline; gap: 10px; text-align: left;
+  background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer;
+  font: 400 34px/1.08 var(--serif); letter-spacing: -0.01em;
+}
+.fire-name svg { color: var(--ink-soft); transform: translateY(-3px); flex: none; }
+.fire-name:hover svg { color: var(--ink); }
+.caption { margin: 8px 0 0; font: 400 15px/1.4 var(--sans); color: var(--ink-soft); }
+
+.fire-list {
+  position: absolute; z-index: 10; top: calc(100% - 30px); left: 0; margin: 0; padding: 6px 0;
+  min-width: 400px; max-height: min(64vh, 540px); overflow-y: auto;
+  background: rgb(22, 25, 28); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.fire-list .group { margin: 12px 14px 4px; font: 500 14px/1.3 var(--sans); color: var(--ink-faint); }
 .fire-list .group:first-child { margin-top: 4px; }
-.compare .fire-list button { display: grid; grid-template-columns: 1fr auto 5.5em; gap: 16px; align-items: baseline; }
-.fire-list .score { font: 500 15px/1.6 var(--sans); color: var(--ink-soft); text-align: right;
-                    font-variant-numeric: tabular-nums; }
+.fire-list button {
+  display: grid; grid-template-columns: 1fr auto 7.5em; gap: 14px; align-items: baseline; width: 100%;
+  background: none; border: 0; padding: 7px 14px; cursor: pointer; text-align: left;
+  font: 400 18px/1.25 var(--serif); color: var(--ink-soft);
+}
+.fire-list button:hover, .fire-list button:focus-visible { color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+.fire-list button[aria-selected="true"] { color: var(--ink); }
+.fire-list .when, .fire-list .score-small { font: 400 14px/1.6 var(--sans); color: var(--ink-faint); white-space: nowrap; }
+.fire-list .score-small { text-align: right; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
-.compare .readout { bottom: 110px; max-width: min(640px, calc(100% - 60px)); }
-.compare .key { flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.day { margin-top: 30px; }
+.eyebrowless { margin: 0; font: 400 15px/1.2 var(--sans); color: var(--ink-faint); }
+.date { margin: 4px 0 0; font: 400 42px/1.05 var(--serif); letter-spacing: -0.015em;
+        font-variant-numeric: lining-nums tabular-nums; }
+
+.key { display: grid; gap: 7px; margin: 24px 0 0; font: 400 15px/1.3 var(--sans); color: var(--ink-soft); }
+.sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 9px; vertical-align: -1px; }
+.sw.outline { background: transparent; box-shadow: inset 0 0 0 1.5px #f0f1ec; }
+.sw.guess { background: rgba(236, 178, 106, 0.8); }
 .sw.hit { background: #ecb26a; }
 .sw.missed { background: #ba7656; }
 .sw.false { background: #9fb4c4; }
+.sw.ash { background: rgba(146, 148, 150, 0.45); }
 .sw.unscored {
-  background: repeating-linear-gradient(45deg, rgba(15, 18, 21, 0.9) 0 2px, rgba(15, 18, 21, 0.35) 2px 4px);
-  box-shadow: inset 0 0 0 1px rgba(217, 218, 214, 0.25);
+  background: repeating-linear-gradient(45deg, #121417 0 2px, #26292d 2px 4px);   /* the veil over land, as on the map */
+  box-shadow: inset 0 0 0 1px rgba(217, 218, 214, 0.22);
 }
-.sw.ramp { width: 44px; border-radius: 4px; background: linear-gradient(90deg, rgba(236, 178, 106, 0.08), #ecb26a); }
-.sw.outline { background: transparent; box-shadow: inset 0 0 0 1.5px #ebece8; }
-.explain { margin: 8px 0 0; max-width: 56ch; font: 400 15px/1.4 var(--serif); color: var(--ink-soft); }
+.hint { margin: 14px 0 0; font: 400 15px/1.4 var(--serif); color: var(--ink-soft); max-width: 30ch; }
+.toggle {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 18px;
+  font: 400 15px/1.3 var(--sans); color: var(--ink-soft); cursor: pointer;
+}
+.toggle input { accent-color: var(--amber); margin: 0; }
 
-.compare .timeline { align-items: stretch; }
-.compare .track { height: 52px; }
-.compare .play { align-self: center; }
-.compare #slider::-webkit-slider-thumb { height: 52px; }
-.compare #slider::-moz-range-thumb { height: 52px; }
-.strip-labels {
-  flex: none; display: flex; flex-direction: column; justify-content: space-between; margin: 0;
-  padding: 14px 0 0; font: 400 12px/1 var(--sans); color: var(--ink-faint);
+/* ---------------------------------------------------------------- maps */
+.maps { grid-row: 1; grid-column: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 16px 16px 0 0; }
+.panel { position: relative; margin: 0; min-height: 0; overflow: hidden; }
+.map { position: absolute; inset: 0; background: var(--land); }
+.panel-name, .score { position: absolute; z-index: 2; left: 16px; margin: 0; text-shadow: var(--halo); pointer-events: none; }
+.panel-name { top: 12px; font: 500 18px/1.2 var(--sans); color: var(--ink); }
+.panel-name select { pointer-events: auto; }
+.score { right: 16px; bottom: 14px; font: 500 16px/1.35 var(--sans); color: var(--ink); max-width: 36ch; }
+#model-b {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%23a3a5a2' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 0 center;
+  border: 0; border-bottom: 1px solid var(--ink-faint); border-radius: 0; padding: 0 20px 2px 0;
+  font: 500 18px/1.2 var(--sans); color: var(--ink); text-shadow: var(--halo);
 }
+#model-b:hover { border-bottom-color: var(--ink-soft); }
+#model-b option { background: rgb(22, 25, 28); color: var(--ink); }
+
+.maplibregl-ctrl-bottom-right { bottom: auto; top: 10px; right: 8px; }
+.maplibregl-ctrl-scale {
+  background: transparent; color: var(--ink-soft); border-color: var(--ink-soft);
+  font: 400 12px var(--sans); text-shadow: var(--halo);
+}
+
+/* ---------------------------------------------------------------- timeline */
+.timeline { grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 32px 0 22px; }
+.play {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center;
+  background: none; border: 0; padding: 0; color: var(--ink); cursor: pointer;
+}
+.play .icon-pause { display: none; }
+.play.is-playing .icon-play { display: none; }
+.play.is-playing .icon-pause { display: block; }
+.track { position: relative; flex: 1; height: 40px; }
+#bars { position: absolute; inset: 0; width: 100%; height: 100%; }
+#slider {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+#slider::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+#slider::-moz-range-track { height: 100%; background: transparent; }
+#slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 40px; background: transparent; border: 0; }
+#slider::-moz-range-thumb { width: 14px; height: 40px; background: transparent; border: 0; }
+#slider:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
 .hover {
-  position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); margin: 0; white-space: nowrap;
-  font: 500 14px/1.2 var(--sans); color: var(--ink); text-shadow: var(--halo); pointer-events: none;
-  font-variant-numeric: tabular-nums;
+  position: absolute; bottom: calc(100% + 4px); transform: translateX(-50%); margin: 0; white-space: nowrap;
+  font: 500 14px/1.2 var(--sans); color: var(--ink); pointer-events: none; font-variant-numeric: tabular-nums;
+}
+.attribution {
+  grid-row: 3; grid-column: 1 / -1; margin: 0; padding: 4px 32px 8px 76px;
+  font: 400 11px/1.3 var(--sans); color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.attribution a { color: inherit; text-decoration: none; }
+.attribution a:hover { color: var(--ink-soft); text-decoration: underline; }
+
+/* ---------------------------------------------------------------- narrow screens: stack */
+@media (max-width: 860px) {
+  body.compare { overflow: auto; height: auto; grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; }
+  .side { grid-row: 1; padding: 18px 18px 6px; overflow: visible; }
+  .side .lead { margin-top: 18px; font-size: 19px; max-width: none; }
+  .fire-name { font-size: 28px; }
+  .day { margin-top: 18px; }
+  .date { font-size: 32px; }
+  .key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 14px; }
+  .hint { display: none; }
+  .maps { grid-row: 2; grid-column: 1; grid-template-columns: 1fr; padding: 10px 0 0; }
+  .panel { height: 46vh; }
+  .timeline { grid-row: 3; padding: 10px 14px 0 8px; }
+  .attribution { grid-row: 4; padding-left: 18px; white-space: normal; }
+  .fire-list { min-width: min(400px, calc(100vw - 36px)); }
 }
 
-@media (max-width: 760px) {
-  .compare .readout { bottom: 100px; }
-  .explain, .strip-labels { display: none; }
-  .compare .key { display: flex; font-size: 13px; }
-  .compare .fire-list { min-width: 300px; }
-}
+/* Keep the six page links on one line in the text column. */
+.side #site-nav ul { gap: 4px 13px; }
+.side #site-nav a { font-size: 14.5px; }
 
-/* The open list sits above the readout and hides what's under it. */
-.compare .top { z-index: 3; }
-.compare .fire-list { background: rgb(22, 25, 28); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); }
+/* The fire list must float over the maps, so the column can't clip it. */
+@media (min-width: 861px) {
+  .side { overflow: visible; position: relative; z-index: 5; }
+}

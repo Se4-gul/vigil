@@ -9,47 +9,64 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="site.css">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="compare.css?v=2">
+  <link rel="stylesheet" href="compare.css?v=7">
 </head>
-<body class="replay compare">
-  <div id="map" aria-label="Map of the selected fire: prediction against what burnt"></div>
-
-  <header class="top">
+<body class="compare">
+  <aside class="side">
     <a class="wordmark" href="index.html">Vigil</a>
     <nav id="site-nav" aria-label="Pages"></nav>
+
+    <p class="lead">Each day, the model sees where the fire is and guesses where it will burn tomorrow.</p>
 
     <div class="fire">
       <button id="fire-name" class="fire-name" aria-haspopup="listbox" aria-expanded="false">
         <span id="fire-label">Loading fires</span><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
       </button>
       <div id="fire-list" class="fire-list" role="listbox" aria-label="Choose a fire" hidden></div>
-      <p id="fire-kind" class="fire-range"></p>
+      <p id="fire-kind" class="caption"></p>
     </div>
 
-    <div class="models" role="radiogroup" aria-label="Model">
-      <div id="model-list" class="model-list"></div>
-      <label class="prob-toggle"><input type="checkbox" id="prob"> Show the main model's probability</label>
+    <div class="day" aria-live="polite">
+      <p class="eyebrowless">Guess for</p>
+      <p id="date" class="date">–</p>
     </div>
-  </header>
 
-  <section class="readout" aria-live="polite">
-    <p id="date" class="date">–</p>
-    <p id="stat" class="stat"></p>
-    <p class="key" id="key-classes">
-      <span><i class="sw hit"></i>hit</span>
-      <span><i class="sw missed"></i>missed</span>
-      <span><i class="sw false"></i>false alarm</span>
-      <span><i class="sw ash"></i>burnt earlier</span>
+    <p class="key" id="key-simple">
+      <span><i class="sw outline"></i>what actually burnt</span>
+      <span><i class="sw guess"></i>the model's guess</span>
+      <span><i class="sw ash"></i>burnt before</span>
       <span><i class="sw unscored"></i>not scored</span>
     </p>
-    <p class="key" id="key-prob" hidden>
-      <span><i class="sw ramp"></i>probability of burning, low to high</span>
-      <span><i class="sw outline"></i>what burnt</span>
-      <span><i class="sw ash"></i>burnt earlier</span>
+    <p class="key" id="key-detail" hidden>
+      <span><i class="sw hit"></i>guessed and burnt</span>
+      <span><i class="sw missed"></i>burnt, not guessed</span>
+      <span><i class="sw false"></i>guessed, didn't burn</span>
+      <span><i class="sw ash"></i>burnt before</span>
       <span><i class="sw unscored"></i>not scored</span>
     </p>
-    <p id="explain" class="explain">A hit burnt where the model said it would. A miss burnt without warning. A false alarm was predicted but didn't burn.</p>
+    <p class="hint" id="hint">Where the fill sits inside the outline, the guess was right.</p>
+
+    <label class="toggle"><input type="checkbox" id="detail"> Show hits, misses and false alarms</label>
+  </aside>
+
+  <section class="maps" aria-label="Two models side by side, same fire and day">
+    <figure class="panel">
+      <div id="map-a" class="map" aria-label="Main model's guess"></div>
+      <figcaption class="panel-name">Main model</figcaption>
+      <p id="score-a" class="score"></p>
+    </figure>
+    <figure class="panel">
+      <div id="map-b" class="map" aria-label="Comparison model's guess"></div>
+      <figcaption class="panel-name">
+        <label class="visually-hidden" for="model-b">Compare with</label>
+        <select id="model-b">
+          <option value="baseline">Simple rule: push the fire downwind</option>
+          <option value="unet">Plain U-Net, no physics</option>
+          <option value="physics">Physics model alone</option>
+        </select>
+      </figcaption>
+      <p id="score-b" class="score"></p>
+    </figure>
   </section>
 
   <section class="timeline" aria-label="Day">
@@ -59,10 +76,9 @@
     </button>
     <div class="track">
       <canvas id="bars" aria-hidden="true"></canvas>
-      <input id="slider" type="range" min="0" max="1" step="1" value="0" aria-label="Predicted day">
+      <input id="slider" type="range" min="0" max="1" step="1" value="0" aria-label="Day">
       <p id="hover" class="hover" hidden></p>
     </div>
-    <p class="strip-labels" aria-hidden="true"><span>new burn</span><span>F1 by day</span></p>
   </section>
 
   <p class="attribution">
@@ -74,7 +90,7 @@
 
   <script src="site.js"></script>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="basemap.js?v=2"></script>
-  <script src="compare.js?v=2"></script>
+  <script src="basemap.js?v=7"></script>
+  <script src="compare.js?v=7"></script>
 </body>
 </html>
