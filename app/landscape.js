@@ -123,6 +123,11 @@ async function showYear(i) {
 }
 
 const pct = x => `${(100 * x).toFixed(x < 0.1 ? 1 : 0)}%`;
+// The bars are a rolling window: the five fire seasons up to the one that ended
+// before this October (e.g. October 2025: 2020–21 to 2024–25). A drop means a
+// big season left the window, not that the land has regrown.
+const season = s => `${s - 1}–${String(s).slice(2)}`;
+const windowText = Y => `the five fire seasons ${season(Y - 4)} to ${season(Y)}`;
 
 function readout() {
   const Y = years[yi], s = meta.share_vic_last5[Y];
@@ -132,10 +137,10 @@ function readout() {
     $("stat").textContent = `Victoria is ${pct(f["forest/woodland"])} forest or woodland and ${pct(f["grass/crop"])} grass or crop.`;
   } else {
     $("date").textContent = `October ${Y}`;
-    $("stat").textContent = `${pct(s)} of Victoria had burnt in the previous five years.`;
+    $("stat").textContent = `${pct(s)} of Victoria burnt in ${windowText(Y)}.`;
   }
   $("slider").value = yi;
-  $("slider").setAttribute("aria-valuetext", `October ${Y}: ${pct(s)} of Victoria burnt in the previous five years`);
+  $("slider").setAttribute("aria-valuetext", `October ${Y}: ${pct(s)} of Victoria burnt in ${windowText(Y)}`);
 }
 
 // ------------------------------------------------------------------ timeline: one bar per October
@@ -167,7 +172,7 @@ function renderBars() {
 function hover(e) {
   const r = bars.getBoundingClientRect(), i = Math.min(years.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * years.length)));
   const Y = years[i], tip = $("hover");
-  tip.textContent = `October ${Y}: ${pct(meta.share_vic_last5[Y])} of Victoria burnt in the previous five years`;
+  tip.textContent = `October ${Y}: ${pct(meta.share_vic_last5[Y])} burnt in ${windowText(Y)}`;
   tip.hidden = false;
   tip.style.left = `${Math.min(Math.max((i + 0.5) / years.length * r.width, 190), r.width - 190)}px`;
 }
@@ -176,7 +181,7 @@ function hover(e) {
 function setFuel(on) {
   fuelOn = on;
   $("fuel").checked = on;
-  $("title").textContent = on ? "What grows there" : "Years since the land last burnt";
+  $("title").textContent = on ? "What grows there" : "How long since the land last burnt";
   $("key-tsb").hidden = on;
   $("key-fuel").hidden = !on;
   $("fuel-credit").hidden = !on;
@@ -210,13 +215,19 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
-function paintRampKey() {
-  const ramp = $("ramp");
-  for (let v = 1; v <= 10; v++) {
-    const s = document.createElement("i"), a = LUT[4 * v + 3] / 255;
-    s.style.background = v === 10 ? "transparent" : `rgba(${LUT[4 * v]},${LUT[4 * v + 1]},${LUT[4 * v + 2]},${a})`;
-    if (v === 10) s.className = "none";
-    ramp.appendChild(s);
+// Legend in plain language: four bands, each swatch a small gradient of the
+// colours inside that band (the map itself steps season by season).
+const BANDS = [[1, 1, "burnt last season"], [2, 3, "2–3 seasons ago"], [4, 9, "4–9 seasons ago"], [10, 10, "10+ seasons, or not in the record"]];
+function paintKey() {
+  const col = v => `rgba(${LUT[4 * v]},${LUT[4 * v + 1]},${LUT[4 * v + 2]},${(LUT[4 * v + 3] / 255).toFixed(2)})`;
+  for (const [lo, hi, text] of BANDS) {
+    const span = document.createElement("span"), sw = document.createElement("i");
+    sw.className = "sw band";
+    if (lo === 10) sw.classList.add("none");
+    else sw.style.background = lo === hi ? col(lo)
+      : `linear-gradient(90deg, ${Array.from({ length: hi - lo + 1 }, (_, j) => col(lo + j)).join(", ")})`;
+    span.append(sw, text);
+    $("key-tsb").appendChild(span);
   }
 }
 
@@ -240,7 +251,8 @@ async function init() {
   paintFuel(await values("fuel"));
   addCanvas("fuel", fuelLayer.canvas, 0);
   refresh("fuel");
-  paintRampKey();
+  paintKey();
+  $("what").querySelector("p").textContent = $("explainer").textContent;   // same words, tap to open on short phones
   const want = years.indexOf(+params.get("year"));
   await document.fonts.ready;
   map.fitBounds(OPENING.bounds, { padding: framing(), duration: 0 });

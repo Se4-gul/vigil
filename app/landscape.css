@@ -1,8 +1,12 @@
 /* Landscape page: Replay's full-bleed map with type set on it, a ramp key for
    years since burnt, and the timeline as a bar per October. */
-.landscape .top { max-width: min(470px, calc(100% - 60px)); }
+.landscape .top { max-width: min(600px, calc(100% - 60px)); }
 .headline { margin: 30px 0 0; font: 400 38px/1.08 var(--serif); letter-spacing: -0.012em; }
-.explainer { margin: 12px 0 0; font: 400 17px/1.45 var(--serif); color: var(--ink); max-width: 40ch; }
+.explainer { margin: 12px 0 0; font: 400 16px/1.45 var(--serif); color: var(--ink); max-width: 60ch; }
+.what { display: none; margin-top: 10px; font: 400 15px/1.3 var(--sans); color: var(--ink-soft); }
+.what summary { cursor: pointer; text-decoration: underline; text-decoration-color: var(--ink-faint); text-underline-offset: 3px; }
+.what p { margin: 6px 0 0; padding: 8px 10px; max-width: 44ch; font: 400 14px/1.45 var(--serif); color: var(--ink);
+          background: rgba(15, 18, 21, 0.85); }
 .safety-note {
   margin: 14px 0 0; padding-left: 12px; border-left: 2px solid var(--amber); max-width: 42ch;
   font: 400 14px/1.4 var(--sans); color: var(--ink-soft);
@@ -15,11 +19,8 @@
 .toggle input { accent-color: var(--amber); margin: 0; }
 
 .landscape .readout { bottom: 104px; max-width: min(460px, calc(100% - 60px)); }
-.ramp-key { margin-top: 12px; width: 260px; }
-.ramp { display: grid; grid-template-columns: repeat(10, 1fr); height: 10px; gap: 1px; }
-.ramp i { display: block; }
-.ramp i.none { box-shadow: inset 0 0 0 1px rgba(217, 218, 214, 0.28); }
-.ramp-labels { display: flex; justify-content: space-between; margin: 5px 0 0; font: 400 13px/1.2 var(--sans); color: var(--ink-soft); }
+.sw.band { width: 22px; height: 10px; border-radius: 2px; }
+.sw.band.none { box-shadow: inset 0 0 0 1px rgba(217, 218, 214, 0.3); }
 .landscape .key { flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; }
 .sw.f1 { background: rgba(100, 146, 102, 0.8); }
 .sw.f2 { background: rgba(216, 186, 122, 0.8); }
@@ -30,7 +31,7 @@
 .landscape .track { height: 56px; }
 .landscape #slider::-webkit-slider-thumb { height: 56px; }
 .landscape #slider::-moz-range-thumb { height: 56px; }
-.strip-label { flex: none; max-width: 15ch; margin: 0; font: 400 12px/1.25 var(--sans); color: var(--ink-faint); }
+.strip-label { flex: none; max-width: 17ch; margin: 0; font: 400 12px/1.25 var(--sans); color: var(--ink-faint); }
 .timeline.is-off { opacity: 0.35; }
 .timeline.is-off #slider, .timeline.is-off .play { cursor: default; }
 .hover {
@@ -40,6 +41,7 @@
 
 @media (max-width: 760px) {
   .landscape .maplibregl-ctrl-bottom-right { bottom: auto; top: 14px; right: 12px; }   /* clear of the key */
+  .landscape .key:not([hidden]) { display: flex; font-size: 13px; gap: 4px 12px; margin-top: 8px; }   /* Replay hides its key here; this one is essential */
   .headline { font-size: 28px; margin-top: 18px; }
   .explainer { font-size: 15px; }
   .landscape .readout { bottom: 96px; }
@@ -47,6 +49,7 @@
   .strip-label { display: none; }
   .landscape .track { height: 48px; }
 }
-@media (max-width: 760px) and (max-height: 760px) {
+@media (max-width: 760px) and (max-height: 860px) {
   .explainer { display: none; }
+  .what { display: block; }          /* the explainer, tap to open */
 }
