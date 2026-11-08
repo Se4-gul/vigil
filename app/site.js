@@ -12,11 +12,15 @@ const PAGES = [
   { href: "about.html",     title: "About",     built: true },
 ];
 
+// Hosts may serve pages without ".html" (Cloudflare Pages redirects
+// /compare.html to /compare), so match on the bare name.
+const bare = s => s.replace(/\.html$/, "") || "index";
+
 (function () {
-  const here = location.pathname.split("/").pop() || "index.html";
-  const page = PAGES.find(p => p.href === here);
+  const here = bare(location.pathname.split("/").pop());
+  const page = PAGES.find(p => bare(p.href) === here);
   if (page && !page.built && !SHOW_UNFINISHED) {
-    location.replace("index.html");
+    location.replace("/");
     return;
   }
   const nav = document.getElementById("site-nav");
@@ -26,9 +30,9 @@ const PAGES = [
     if (!p.built && !SHOW_UNFINISHED) continue;
     const li = document.createElement("li");
     const a = document.createElement("a");
-    a.href = p.href;
+    a.href = "/" + p.href;            // absolute, so links also work from the 404 page at any path
     a.textContent = p.title;
-    if (p.href === here) a.setAttribute("aria-current", "page");
+    if (bare(p.href) === here) a.setAttribute("aria-current", "page");
     if (!p.built) a.classList.add("unbuilt");
     li.appendChild(a);
     ul.appendChild(li);

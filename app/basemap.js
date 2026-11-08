@@ -8,6 +8,11 @@ function makeBasemap(onReady, view = { center: [148.6, -37.3], zoom: 7 },
     container, attributionControl: attribution ? { compact: true } : false,
     style: "https://tiles.openfreemap.org/styles/dark", maxZoom: 12, ...view,
   });
+  // The OpenFreeMap dark style names a few icons its own sprite lacks (e.g.
+  // "circle-11"); give them a transparent pixel instead of a console warning.
+  map.on("styleimagemissing", e => {
+    if (!map.hasImage(e.id)) map.addImage(e.id, { width: 1, height: 1, data: new Uint8Array(4) });
+  });
   if (scale) map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
   map.on("style.load", () => {
     let firstLabelLayer;
