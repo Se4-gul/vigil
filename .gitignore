@@ -26,3 +26,8 @@ docs/figures/*.gif
 
 # Local Claude Code instructions (how we work; not part of the project)
 CLAUDE.local.md
+
+# Release data files (published on Zenodo; rebuild with python -m vigil.release)
+release/data/
+release/*.csv
+release/SHA256SUMS
