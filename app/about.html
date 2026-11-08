@@ -14,7 +14,7 @@
   </header>
   <main>
     <h1>About Vigil</h1>
-    <p class="lead">Vigil replays real bushfires in Victoria day by day and tests how well different models predict where a fire will burn next. It's a student research project.</p>
+    <p class="lead">Vigil replays real bushfires in Victoria day by day, tests how well different models predict where a fire will burn next, and maps how long ago the land last burnt. It's a student research project.</p>
 
     <p class="safety">Don't use Vigil to make decisions about your safety. It shows past fires and experimental predictions, not current conditions. For fire information and warnings, use <a href="https://www.emergency.vic.gov.au">VicEmergency</a> or your state's fire service, and follow official advice.</p>
 
@@ -22,16 +22,25 @@
     <p>Each coloured cell is a 375 m square of land, shown on the day it first burnt. Amber means it's burning that day, copper means it burnt in the last few days, and grey is the scar left behind.</p>
     <p>The burnt area comes from MODIS satellite burned-area maps, which give each fire's final outline. The timing within that outline comes from VIIRS satellite fire detections: every cell takes the date of the nearest detection that agrees with the burned-area map to within a few days. This follows Parks (2014). A fire day runs from 6 am to 6 am, so a satellite pass at 2 am counts toward the day whose fire it saw.</p>
 
+    <h2>What Compare shows</h2>
+    <p>Each day, a model sees where the fire is and guesses where it will burn tomorrow. Compare puts that guess next to what actually burnt, for the main model and a second model of your choice. Every prediction is out of sample: the 2019–20 fires come from models that never saw that season, and fires from other seasons come from models trained without the season they're shown on. Fires that the models get badly wrong, mostly grass fires, are included on purpose.</p>
+
+    <h2>What Landscape shows</h2>
+    <p>How long ago each place last burnt, as at 1 October each year, before that season's fires. It uses the MODIS burned-area record on both sides of the border, so it starts in 2002 and misses many small fires. The bars underneath count the share of Victoria burnt in the five fire seasons before each October; they fall when a big season like 2019–20 leaves that window, not because the land has grown back. It isn't a fire-risk rating.</p>
+
     <h2>What it can't show</h2>
     <ul>
       <li>Timing is accurate to about a day. Smoke and cloud can hide a fire from the satellites for several days.</li>
       <li>Small and fast grass fires are often missing, because the burned-area maps miss most of them.</li>
-      <li>Only October to April is covered: the fire season, and the months our weather data spans.</li>
+      <li>Only October to April is covered: the fire season, and the months the weather data spans.</li>
+      <li>The study area is a box around Victoria (140.8° to 150.1° E, 33.8° to 39.3° S). Fires that run past its edge, including some New South Wales fires in 2019–20, are cut off there, and the last 6 km inside the edge isn't scored.</li>
+      <li>The predictions use the weather that actually happened the next day, as if the forecast were perfect. A real forecast would make them worse.</li>
       <li>Cells are 375 m across. Nothing finer than that is real, so edges are softened rather than drawn sharp.</li>
     </ul>
 
     <h2>The models</h2>
-    <p>Vigil compares simple baselines (assume the fire keeps growing at its edge, optionally pushed downwind), a physics model built on the CSIRO fire-spread equations for forest, grassland and heath, and a neural network trained on past fires. Each one predicts the next day's burnt area and is tested on fire seasons it never saw. The 2019–20 Black Summer season is held back entirely as the final test. Results will appear on the Findings page.</p>
+    <p>Vigil compares simple baselines (assume the fire keeps growing from where it's burning, optionally pushed downwind), a physics model built on the CSIRO fire-spread equations for forest, grassland and heath, and neural networks (U-Nets) trained on past fires. Each one predicts the next day's newly burnt area. Models were chosen and tuned on twelve other fire seasons, and the 2019–20 Black Summer season was held back and tested once, at the end.</p>
+    <p>The main model is a U-Net that is given the physics model's prediction as one of its inputs, but not the raw weather. On its own the network didn't learn much from the weather maps, and the physics prediction already carries the wind. On the 2019–20 fires, it caught about 4 in 10 of the cells that burnt the next day, against about 2 in 10 for the best simple rule, with about a third of its guesses right for both. The physics model alone does poorly, because it assumes every fire keeps running freely for a full day. No model predicts long jumps of more than 6 km well, and grass fires are the hardest.</p>
 
     <h2>Data and credits</h2>
     <ul>
@@ -45,11 +54,14 @@
       <li>State boundaries: Australian Bureau of Statistics, CC BY 4.0.</li>
       <li>Basemap: <a href="https://openfreemap.org">OpenFreeMap</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>, map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.</li>
       <li>Hillshade: <a href="https://registry.opendata.aws/terrain-tiles/">Terrain Tiles</a> on AWS Open Data (Mapzen/Tilezen).</li>
-      <li>Map rendering: MapLibre GL JS. Type: Newsreader and Barlow Semi Condensed.</li>
+      <li>Map rendering: MapLibre GL JS. Type: Newsreader and Barlow Semi Condensed, SIL Open Font License, served from this site.</li>
     </ul>
 
+    <h2>Privacy</h2>
+    <p>Vigil sets no cookies and has no analytics or tracking. The map library is loaded from unpkg, map tiles from OpenFreeMap and terrain from Amazon Web Services; those services see requests the way any website does.</p>
+
     <h2>Who made it</h2>
-    <p>Vigil is a portfolio project by Rishi, a first-year data science student at RMIT University. It isn't affiliated with any fire agency.</p>
+    <p>I'm Rishi, a data science student at RMIT University, and I built Vigil as a portfolio project. It isn't affiliated with any fire agency.</p>
     <p class="meta">Method references: Parks (2014), <em>International Journal of Wildland Fire</em> 23(2); Huot et al. (2022), "Next Day Wildfire Spread", <em>IEEE Transactions on Geoscience and Remote Sensing</em>; Cheney et al. (1998, 2012) for the grassland and dry eucalypt forest spread models.</p>
   </main>
   <script src="site.js"></script>
