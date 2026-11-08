@@ -1,0 +1,52 @@
+/* Landscape page: Replay's full-bleed map with type set on it, a ramp key for
+   years since burnt, and the timeline as a bar per October. */
+.landscape .top { max-width: min(470px, calc(100% - 60px)); }
+.headline { margin: 30px 0 0; font: 400 38px/1.08 var(--serif); letter-spacing: -0.012em; }
+.explainer { margin: 12px 0 0; font: 400 17px/1.45 var(--serif); color: var(--ink); max-width: 40ch; }
+.safety-note {
+  margin: 14px 0 0; padding-left: 12px; border-left: 2px solid var(--amber); max-width: 42ch;
+  font: 400 14px/1.4 var(--sans); color: var(--ink-soft);
+}
+.safety-note a { color: var(--ink); text-underline-offset: 3px; }
+.toggle {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+  font: 400 15px/1.3 var(--sans); color: var(--ink-soft); cursor: pointer;
+}
+.toggle input { accent-color: var(--amber); margin: 0; }
+
+.landscape .readout { bottom: 104px; max-width: min(460px, calc(100% - 60px)); }
+.ramp-key { margin-top: 12px; width: 260px; }
+.ramp { display: grid; grid-template-columns: repeat(10, 1fr); height: 10px; gap: 1px; }
+.ramp i { display: block; }
+.ramp i.none { box-shadow: inset 0 0 0 1px rgba(217, 218, 214, 0.28); }
+.ramp-labels { display: flex; justify-content: space-between; margin: 5px 0 0; font: 400 13px/1.2 var(--sans); color: var(--ink-soft); }
+.landscape .key { flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; }
+.sw.f1 { background: rgba(100, 146, 102, 0.8); }
+.sw.f2 { background: rgba(216, 186, 122, 0.8); }
+.sw.f3 { background: rgba(168, 156, 116, 0.45); }
+.sw.f4 { background: repeating-linear-gradient(45deg, rgba(120, 132, 156, 0.75) 0 2px, rgba(120, 132, 156, 0.25) 2px 4px); }
+.caveat { margin: 10px 0 0; max-width: 52ch; font: 400 13px/1.4 var(--sans); color: var(--ink-faint); text-shadow: var(--halo); }
+
+.landscape .track { height: 56px; }
+.landscape #slider::-webkit-slider-thumb { height: 56px; }
+.landscape #slider::-moz-range-thumb { height: 56px; }
+.strip-label { flex: none; max-width: 15ch; margin: 0; font: 400 12px/1.25 var(--sans); color: var(--ink-faint); }
+.timeline.is-off { opacity: 0.35; }
+.timeline.is-off #slider, .timeline.is-off .play { cursor: default; }
+.hover {
+  position: absolute; bottom: calc(100% + 4px); transform: translateX(-50%); margin: 0; white-space: nowrap;
+  font: 500 14px/1.2 var(--sans); color: var(--ink); text-shadow: var(--halo); pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .landscape .maplibregl-ctrl-bottom-right { bottom: auto; top: 14px; right: 12px; }   /* clear of the key */
+  .headline { font-size: 28px; margin-top: 18px; }
+  .explainer { font-size: 15px; }
+  .landscape .readout { bottom: 96px; }
+  .caveat { display: none; }
+  .strip-label { display: none; }
+  .landscape .track { height: 48px; }
+}
+@media (max-width: 760px) and (max-height: 760px) {
+  .explainer { display: none; }
+}

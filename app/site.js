@@ -7,7 +7,7 @@ const PAGES = [
   { href: "index.html",     title: "Replay",    built: true },
   { href: "compare.html",   title: "Compare",   built: true },
   { href: "whatif.html",    title: "What-if",   built: false },
-  { href: "landscape.html", title: "Landscape", built: false },
+  { href: "landscape.html", title: "Landscape", built: true },
   { href: "findings.html",  title: "Findings",  built: false },
   { href: "about.html",     title: "About",     built: true },
 ];

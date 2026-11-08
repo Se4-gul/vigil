@@ -5,17 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vigil · Landscape</title>
   <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="landscape.css?v=3">
 </head>
-<body class="page">
-  <header>
+<body class="replay landscape">
+  <div id="map" aria-label="Map of years since the land last burnt"></div>
+
+  <header class="top">
     <a class="wordmark" href="index.html">Vigil</a>
     <nav id="site-nav" aria-label="Pages"></nav>
+
+    <h1 id="title" class="headline">Years since the land last burnt</h1>
+    <p class="explainer">Recently burnt land has less fuel, so fires there tend to spread less. Fuel builds back over roughly a decade, and the scars fade from the map as it does.</p>
+    <p class="safety-note">Not a fire-risk rating and not for safety decisions; for current warnings, see <a href="https://www.emergency.vic.gov.au" rel="noopener">VicEmergency</a>.</p>
+    <label class="toggle"><input type="checkbox" id="fuel"> Show fuel types instead</label>
   </header>
-  <main>
-    <h1>Landscape</h1>
-    <p class="placeholder">How long ago each part of the landscape last burnt, and how its fuel has grown back since. Not built yet.</p>
-  </main>
+
+  <section class="readout" aria-live="polite">
+    <p id="date" class="date">–</p>
+    <p id="stat" class="stat"></p>
+    <div id="key-tsb" class="ramp-key">
+      <div class="ramp" id="ramp" aria-hidden="true"></div>
+      <p class="ramp-labels"><span>1 year</span><span>5</span><span>10+ years, or never</span></p>
+    </div>
+    <p id="key-fuel" class="key" hidden>
+      <span><i class="sw f1"></i>forest and woodland</span>
+      <span><i class="sw f2"></i>shrub and heath</span>
+      <span><i class="sw f3"></i>grass, crop and wetland</span>
+      <span><i class="sw f4"></i>not burnable, or urban</span>
+    </p>
+    <p id="caveat" class="caveat">From NASA's MODIS burned-area record, which starts in 2002. Cells are about 500 m across, so small fires may be missed. The same record covers both sides of the border, within the study area shown.</p>
+  </section>
+
+  <section class="timeline" aria-label="Year">
+    <button id="play" class="play" aria-label="Play">
+      <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>
+    </button>
+    <div class="track">
+      <canvas id="bars" aria-hidden="true"></canvas>
+      <input id="slider" type="range" min="0" max="12" step="1" value="7" aria-label="October of year">
+      <p id="hover" class="hover" hidden></p>
+    </div>
+    <p class="strip-label" aria-hidden="true">Share of Victoria burnt in the previous 5 years</p>
+  </section>
+
+  <p class="attribution">
+    Basemap <a href="https://openfreemap.org">OpenFreeMap</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>,
+    © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.
+    Terrain <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>.
+    Burned area: NASA MODIS MCD64A1. <span id="fuel-credit" hidden>Fuel types: CSIRO Bushfire Fuel Classification, CC BY-NC 4.0.</span>
+    Full credits on <a href="about.html">About</a>.
+  </p>
+
   <script src="site.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+  <script src="basemap.js?v=9"></script>
+  <script src="landscape.js?v=5"></script>
 </body>
 </html>
