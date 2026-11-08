@@ -132,7 +132,7 @@ Details, including scores by distance from the fire and where the models fail: h
 
 ## Distribution
 
-- **Licence:** CC BY 4.0. Please cite this dataset and the sources below.
+- **Licence:** CC BY 4.0. Please cite this dataset and the sources below. Licences of the upstream sources are listed in [DATA_LICENSES.md](https://github.com/Se4-gul/vigil/blob/main/DATA_LICENSES.md).
 - **Code that builds it:** https://github.com/Se4-gul/vigil (`src/vigil/events.py`, `src/vigil/labels.py`, `src/vigil/release.py`). The raw detections are not included; the download scripts fetch them.
 
 ## Sources and credits

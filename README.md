@@ -69,8 +69,8 @@ data/             raw and processed data (not committed)
 
 Built on Huot et al. (2022), "Next Day Wildfire Spread"; Parks (2014) for day-of-burning maps; and CSIRO fire spread models (Cheney et al. 1998 and 2012, Cruz et al. 2013 and 2015). Full references with DOIs are on the [Findings](https://vigil-c5o.pages.dev/findings) page.
 
-Data: NASA FIRMS VIIRS and MODIS MCD64A1, Bureau of Meteorology BARRA2, SILO, Copernicus DEM, the CSIRO Bushfire Fuel Classification fuel map, Victorian (DEECA), NSW (NPWS) and South Australian (DEW) fire history, and ABS boundaries. Licences and links are in [LICENSE](LICENSE).
+Data: NASA FIRMS VIIRS and MODIS MCD64A1, Bureau of Meteorology BARRA2, SILO, Copernicus DEM, the CSIRO Bushfire Fuel Classification fuel map, Victorian (DEECA), NSW (NPWS) and South Australian (DEW) fire history, and ABS boundaries. Licences and links are in [DATA_LICENSES.md](DATA_LICENSES.md).
 
-Code is MIT. The derived data and the website are non-commercial, because the CSIRO fuel map is CC BY-NC 4.0.
+Code is MIT ([LICENSE](LICENSE)). The derived data and the website are non-commercial, because the CSIRO fuel map is CC BY-NC 4.0.
 
 Not for safety decisions. For current fires, see [VicEmergency](https://emergency.vic.gov.au).
