@@ -145,3 +145,10 @@ body.compare {
 @media (min-width: 861px) {
   .side { overflow: visible; position: relative; z-index: 5; }
 }
+
+/* The one flagged statement, as on About: an amber rule, quiet type. */
+.safety-note {
+  margin: 26px 0 0; padding-left: 12px; border-left: 2px solid var(--amber); max-width: 34ch;
+  font: 400 14px/1.4 var(--sans); color: var(--ink-soft);
+}
+.safety-note a { color: var(--ink); text-underline-offset: 3px; }

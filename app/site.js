@@ -1,7 +1,7 @@
 // Site-wide navigation. One list of pages; unbuilt pages show a one-line
 // placeholder. Set SHOW_UNFINISHED to false before publishing: unbuilt pages
 // disappear from the nav, and visiting one redirects to the replay.
-const SHOW_UNFINISHED = true;
+const SHOW_UNFINISHED = false;
 
 const PAGES = [
   { href: "index.html",     title: "Replay",    built: true },

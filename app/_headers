@@ -1,0 +1,7 @@
+# Read by Cloudflare Pages and Netlify. The site sets no cookies and loads no
+# analytics; the policy only allows the few hosts it actually uses.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://tiles.openfreemap.org https://elevation-tiles-prod.s3.amazonaws.com; connect-src 'self' https://tiles.openfreemap.org https://elevation-tiles-prod.s3.amazonaws.com; worker-src blob:; child-src blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
