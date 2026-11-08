@@ -40,7 +40,7 @@ derived data and the website are for non-commercial use only.
   open data, no restrictions on use.
   https://doi.org/10.5067/MODIS/MCD64A1.061
 - Bureau of Meteorology BARRA2 reanalysis (BARRA-C2): CC BY 4.0.
-  https://registry.opendata.aws/bom-barra2/
+  https://registry.opendata.aws/australian-bureau-of-meteorology-barra-2/
 - SILO climate data, Queensland Government: CC BY 4.0.
   https://www.longpaddock.qld.gov.au/silo/
 - Copernicus DEM GLO-90: free under the Copernicus DEM licence.
@@ -53,10 +53,11 @@ derived data and the website are for non-commercial use only.
   https://creativecommons.org/licenses/by-nc/4.0/
 - Victorian fire history, State of Victoria (DEECA): CC BY 4.0.
   https://discover.data.vic.gov.au/dataset/fire-history-records-of-fires-across-victoria
-- NSW fire history, NSW National Parks and Wildlife Service: CC BY.
+- NSW fire history, NSW National Parks and Wildlife Service: CC BY 4.0.
   https://datasets.seed.nsw.gov.au/dataset/1d05e145-80cb-4275-af9b-327a1536798d
-- South Australian fire history, Department for Environment and Water: CC BY.
-  https://data.sa.gov.au/
+- South Australian fire history, Department for Environment and Water: CC BY
+  (version not stated by the publisher).
+  https://data.sa.gov.au/data/dataset/fire-history
 - State boundaries (ASGS Edition 3), Australian Bureau of Statistics: CC BY 4.0.
   https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3
 - Fonts in app/fonts/ (Newsreader, Barlow Semi Condensed): SIL Open Font
