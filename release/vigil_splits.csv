@@ -1,0 +1,14 @@
+season,season_span,fold,role
+2013,2012-13,0,cross-validation
+2014,2013-14,1,cross-validation
+2015,2014-15,2,cross-validation
+2016,2015-16,3,cross-validation
+2017,2016-17,4,cross-validation
+2018,2017-18,3,cross-validation
+2019,2018-19,2,cross-validation
+2020,2019-20,test,test (run once)
+2021,2020-21,2,cross-validation
+2022,2021-22,2,cross-validation
+2023,2022-23,4,cross-validation
+2024,2023-24,3,cross-validation
+2025,2024-25,4,cross-validation

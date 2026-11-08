@@ -31,3 +31,4 @@ CLAUDE.local.md
 release/data/
 release/*.csv
 release/SHA256SUMS
+!release/vigil_splits.csv
