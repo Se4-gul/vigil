@@ -1,0 +1,61 @@
+/* Findings: About's reading column, with figures that step out a little
+   wider than the text, one plain table and one small-multiple bar chart. */
+.findings main { max-width: calc(34rem + 64px); }   /* 34rem of 18px serif is about 65 characters a line */
+
+/* Contents list: the empty left margin on wide screens, styled like the nav. */
+html:has(body.findings) { scroll-behavior: smooth; }       /* site.css turns this off under reduced motion */
+.findings h2 { scroll-margin-top: 24px; }
+.findings .layout { display: grid; grid-template-columns: 1fr minmax(0, calc(34rem + 64px)) 1fr; }
+.findings .layout main { grid-column: 2; grid-row: 1; max-width: none; margin: 0; }
+.findings .toc { display: none; grid-column: 1; grid-row: 1; justify-self: end; align-self: start;
+                 position: sticky; top: 32px; margin-top: 148px; padding-right: 40px; }
+.findings .toc ul { list-style: none; margin: 0; padding: 0; }
+.findings .toc li { margin: 0 0 9px; }
+.findings .toc a { font: 500 15px/1.2 var(--sans); color: var(--ink-soft); text-decoration: none; }
+.findings .toc a:hover { color: var(--ink); }
+.findings .toc a[aria-current] { color: var(--amber); }
+.findings b { font-weight: 600; }
+.findings .models li { margin: 8px 0; }
+.findings .headline { font: 500 22px/1.45 var(--serif); margin: 30px 0 14px; }
+.findings .refs li { font-size: 16px; line-height: 1.5; }
+
+.findings figure { margin: 36px 0; }
+.findings figure.wide { margin-left: calc(50% - min(48vw, 520px)); margin-right: calc(50% - min(48vw, 520px)); }
+.table-wrap.wide { margin-left: calc(50% - min(48vw, 430px)); margin-right: calc(50% - min(48vw, 430px)); }
+.findings figure img { display: block; width: 100%; height: auto; border-radius: 2px; }
+.findings figcaption { margin: 10px auto 0; max-width: 68ch; font: 400 15px/1.45 var(--sans); color: var(--ink-soft); }
+.findings figure.wide figcaption { padding: 0 2px; }
+.findings .bands { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
+.findings .bands i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+
+/* Table: no box, hairlines between rows, figures right-aligned in tabular numerals. */
+.table-wrap { overflow-x: auto; margin: 22px 0 6px; }
+.findings table { width: 100%; border-collapse: collapse; font: 400 16px/1.35 var(--sans); font-variant-numeric: tabular-nums; }
+.findings caption { text-align: left; font: 500 16px/1.3 var(--sans); color: var(--ink-soft); padding-bottom: 8px; }
+.findings th, .findings td { padding: 8px 10px; border-bottom: 1px solid rgba(217, 218, 214, 0.14); text-align: right; white-space: nowrap; }
+.findings th[scope="row"], .findings thead th:first-child { text-align: left; font-weight: 400; }
+.findings thead th { font-weight: 500; color: var(--ink-soft); vertical-align: bottom; white-space: normal; border-bottom-color: rgba(217, 218, 214, 0.3); }
+.findings tr.main th, .findings tr.main td { color: #fff; font-weight: 600; }
+.findings tr.main th { box-shadow: inset 2px 0 0 var(--amber); }
+
+/* Distance-band chart: one grid, models down the side, three bands on one shared 0 to 0.5 scale. */
+.bands-chart { display: grid; grid-template-columns: max-content repeat(3, minmax(0, 1fr)); gap: 6px 22px; align-items: center; }
+.bands-chart .h { font: 500 15px/1.2 var(--sans); color: var(--ink); padding-bottom: 4px; }
+.bands-chart .name { font: 400 14px/1.2 var(--sans); color: var(--ink-soft); }
+.bands-chart .cell { display: flex; align-items: center; gap: 8px; font: 400 14px/1 var(--sans); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.bands-chart .bar { flex: none; height: 10px; width: calc(var(--v) / 0.5 * (100% - 3.5em)); min-width: 1px; background: rgba(146, 148, 150, 0.7); border-radius: 0 3px 3px 0; }
+.bands-chart .cell.main .bar { background: var(--amber); }
+.bands-chart .name.main, .bands-chart .cell.main { color: var(--ink); }
+
+@media (max-width: 700px) {
+  .findings figure.wide, .table-wrap.wide { margin-left: -12px; margin-right: -12px; }
+  .bands-chart { grid-template-columns: max-content repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
+  .bands-chart .h { font-size: 13px; }
+  .findings .headline { font-size: 20px; }
+}
+
+@media (min-width: 1100px) {
+  .findings .toc { display: block; }
+  /* With the list in the left margin, wide figures and the table grow to the right only. */
+  .findings figure.wide, .findings .table-wrap.wide { margin-left: 0; margin-right: 0; width: min(900px, calc(50vw + 17rem - 32px)); }
+}

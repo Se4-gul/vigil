@@ -46,12 +46,12 @@ a { color: inherit; }
   * { scroll-behavior: auto !important; }
 }
 
-/* Text pages (About, placeholders): a quiet column on the land tone. */
+/* Text pages (About, Findings, placeholders): a centred reading column on the land tone. */
 .page { min-height: 100vh; background: var(--land); }
 .page header { padding: 28px 32px 0; }
-.page main { max-width: 64ch; margin: 0 auto; padding: 40px 32px 96px; }
+.page main { max-width: calc(34rem + 64px); margin: 0 auto; padding: 40px 32px 96px; }   /* about 65 characters a line, as on Findings */
 .page h1 { font: 400 46px/1.08 var(--serif); letter-spacing: -0.01em; margin: 0 0 18px; }
-.page h2 { font: 500 24px/1.2 var(--serif); margin: 44px 0 10px; }
+.page h2 { font: 500 24px/1.2 var(--serif); margin: 52px 0 10px; }
 .page p, .page li { font: 400 18px/1.6 var(--serif); color: var(--ink); }
 .page .lead { font-size: 21px; color: var(--ink); }
 .page .placeholder { font: 400 21px/1.5 var(--serif); color: var(--ink-soft); }

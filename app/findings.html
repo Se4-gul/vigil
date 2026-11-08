@@ -4,18 +4,153 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vigil · Findings</title>
+  <meta name="description" content="How well Vigil's models predict next-day bushfire spread, tested once on the 2019–20 Black Summer fires.">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Vigil">
+  <meta property="og:title" content="Vigil · Findings">
+  <meta property="og:description" content="How well the models predict next-day bushfire spread, tested once on the 2019–20 Black Summer fires.">
+  <meta property="og:url" content="https://vigil-c5o.pages.dev/findings">
+  <meta property="og:image" content="https://vigil-c5o.pages.dev/img/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="fonts/fonts.css">
-  <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="site.css?v=5">
+  <link rel="stylesheet" href="findings.css?v=7">
 </head>
-<body class="page">
+<body class="page findings">
   <header>
-    <a class="wordmark" href="index.html">Vigil</a>
+    <a class="wordmark" href="/">Vigil</a>
     <nav id="site-nav" aria-label="Pages"></nav>
   </header>
+  <div class="layout">
+    <nav class="toc" aria-label="On this page">
+      <ul>
+        <li><a href="#question">Question</a></li>
+        <li><a href="#data">Data</a></li>
+        <li><a href="#models">Models</a></li>
+        <li><a href="#testing">Testing</a></li>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#surprises">Surprises</a></li>
+        <li><a href="#failures">Where it fails</a></li>
+        <li><a href="#next">Next</a></li>
+        <li><a href="#references">References</a></li>
+      </ul>
+    </nav>
   <main>
     <h1>Findings</h1>
-    <p class="placeholder">What the models got right and wrong, with the numbers behind it. Not built yet.</p>
+
+    <h2 id="question">The question</h2>
+    <p>If you know where a bushfire is burning today, can you predict where it will burn tomorrow? I tried to answer that for Victoria and the edges of New South Wales, one day ahead, at a resolution of 375 metres. I compared a simple rule of thumb, a physics model built from CSIRO fire-spread equations, and neural networks trained on past fires.</p>
+
+    <h2 id="data">The data</h2>
+    <p>There's no public record of where a fire was on each day, so I built one. NASA's VIIRS satellite records hot spots about 375 metres across, roughly twice a day. I used every detection from 2012 onwards, removed false alarms like steelworks and power stations that show up as "fires" year after year, and grouped detections that were close in space and time into individual fires.</p>
+    <p>Detections alone miss a lot. Smoke and cloud hide fires, and fronts move between satellite passes: for the 2019–20 Black Summer, detections caught only 49% of the burnt area in Victoria's own fire records. So I also used NASA's MODIS burned-area maps, which show what burnt each month, and gave each burnt cell the date of the nearest satellite detection, following Parks (2014). On cells where I hid the real detection, the estimated burn day was within one day 91% of the time.</p>
+    <p>Around each fire I added terrain, fuel type from CSIRO's national fuel map, how long since each place last burnt, hourly wind, temperature and humidity from the Bureau of Meteorology's BARRA reanalysis, and dryness worked out from daily rainfall. A "fire day" runs from 6 am to 6 am, so the satellite's 2 am pass counts towards the day whose fire it saw, and documented arrivals land on the right date: the fire reaches Mallacoota on 31 December.</p>
+
+    <figure class="wide">
+      <img src="img/findings_burn_days.jpg" width="1980" height="1098" loading="lazy"
+           alt="Map of the 2019–20 East Gippsland fire, shaded from dark copper for the earliest burning to pale amber for the latest.">
+      <figcaption>
+        <span class="cap">The East Gippsland fire of 2019–20, with each 375 m cell coloured by the day it first burnt. This is the kind of daily map the models learn from and are scored against.</span>
+        <span class="bands">
+          <span><i style="background:#6e3a29"></i>before 29 Dec</span>
+          <span><i style="background:#87573e"></i>29 to 30 Dec</span>
+          <span><i style="background:#a17454"></i>31 Dec</span>
+          <span><i style="background:#bc936b"></i>1 to 3 Jan</span>
+          <span><i style="background:#d6b283"></i>4 Jan</span>
+          <span><i style="background:#f2d29b"></i>after 4 Jan</span>
+        </span>
+      </figcaption>
+    </figure>
+
+    <h2 id="models">The models</h2>
+    <ul class="models">
+      <li><b>Simple rule:</b> assume tomorrow's fire is today's active fire, nudged downwind.</li>
+      <li><b>Physics model:</b> a grid simulation that spreads fire hour by hour with CSIRO's published spread equations for forest, grass and heath, adjusted for slope and wind.</li>
+      <li><b>Plain U-Net:</b> a neural network that takes maps of the fire, land and weather and draws a map of where it will burn next, following Huot et al. (2022).</li>
+      <li><b>U-Net + physics:</b> the same network, also given the physics model's prediction as an extra map.</li>
+      <li><b>Main model:</b> U-Net + physics without the raw weather maps, so weather reaches it only through the physics prediction.</li>
+    </ul>
+
+    <h2 id="testing">How it was tested</h2>
+    <p>The test was the 2019–20 fire season, Black Summer, with 39 fires. No model saw it during development. Every choice was made using the other 12 seasons (2013 to 2019 and 2021 to 2025): I split them into 5 groups of whole seasons, trained on 4 and scored on the fifth, and rotated. Whole seasons matter, because fires in one season share weather; mixing days from the same season into training and scoring would flatter the models.</p>
+    <p>Before touching the test season I wrote down a protocol: which models, which settings, how thresholds would be picked, which scores, how to measure uncertainty, and what I expected. Then I ran the test once. The script refuses to run a second time.</p>
+
+    <h2 id="results">Results</h2>
+    <p>The score is F1, from 0 to 1. It's high when a model catches the cells that burnt without also flagging cells that didn't. "Caught" below is the share of newly burnt cells a model predicted, and "right" is the share of its predictions that burnt.</p>
+
+    <div class="table-wrap wide">
+      <table>
+        <caption>Next-day prediction on the 2019–20 fires</caption>
+        <thead>
+          <tr><th scope="col">Model</th><th scope="col">Test F1</th><th scope="col">95% range</th><th scope="col">Caught</th><th scope="col">Right</th><th scope="col">F1, other 12 seasons</th></tr>
+        </thead>
+        <tbody>
+          <tr class="main"><th scope="row">Main model</th><td>0.362</td><td>0.330 to 0.428</td><td>39%</td><td>34%</td><td>0.318</td></tr>
+          <tr><th scope="row">U-Net + physics</th><td>0.341</td><td>0.297 to 0.390</td><td>45%</td><td>28%</td><td>0.285</td></tr>
+          <tr><th scope="row">Plain U-Net</th><td>0.311</td><td>0.266 to 0.366</td><td>50%</td><td>23%</td><td>0.276</td></tr>
+          <tr><th scope="row">Simple rule</th><td>0.265</td><td>0.252 to 0.307</td><td>22%</td><td>34%</td><td>0.217</td></tr>
+          <tr><th scope="row">Physics model alone</th><td>0.085</td><td>0.043 to 0.138</td><td>5%</td><td>28%</td><td>0.061</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="meta">Ranges come from resampling the test fires 2,000 times. Neural network scores are the average of 3 training runs.</p>
+
+    <p class="headline">On the unseen 2019–20 season, the main model beat the simple rule by 0.097 F1 (95% range 0.072 to 0.134).</p>
+    <p>It also beat the plain U-Net, by 0.051 (0.006 to 0.083), but that needs a caveat. The plain U-Net over-predicts: it catches more and is right less. A score that doesn't depend on where the yes/no line is drawn (PR-AUC) puts the two level, 0.257 for the main model and 0.265 for the plain U-Net. So on the test season the main model's edge comes from making better-sized predictions, not from ranking cells better.</p>
+
+    <figure class="wide">
+      <a href="/compare.html?fire=26900&amp;day=2020-01-04"><img src="img/findings_compare_harrietville.jpg" width="1046" height="733" loading="lazy"
+           alt="Two maps of the fire near Harrietville on 4 January 2020. Left, the main model's guess fills most of the area that burnt. Right, the simple rule's guess is a thin rim around the existing fire."></a>
+      <figcaption><span class="cap">Near Harrietville, 4 January 2020, on the <a href="/compare.html?fire=26900&amp;day=2020-01-04">Compare page</a>. The white outline is what burnt; amber is each model's guess from the day before. The main model (left) caught 7 in 10 cells that burnt, the simple rule (right) 2 in 10, and both had 6 in 10 of their guesses right. One of the model's better days. Across the whole season it caught about 4 in 10.</span></figcaption>
+    </figure>
+
+    <h2 id="surprises">What surprised me</h2>
+    <p><b>The network ignored the wind.</b> To check whether the plain U-Net used wind, I rotated the wind maps by 90° and 180° while scoring. The predictions barely changed; F1 even went up slightly, by 0.002 and 0.010. From about 2,000 training examples, it never learnt wind direction from the raw maps. The physics model uses wind through its equations, and the network did use that. With the settings held the same, removing the raw weather maps and keeping physics raised the score on the other seasons from 0.285 to 0.310 (re-tuning the settings for that model then took it to 0.318, the number in the table). My reading is that the network corrects the physics model rather than relearning fire behaviour from scratch.</p>
+    <p><b>A random forest fell apart on new seasons.</b> Huot et al. found a random forest beat logistic regression. On my season split it scored 0.047 F1 against 0.193 for logistic regression. I checked for bugs and found none: it fitted its training seasons well (best F1 0.33 to 0.35), but its top features were fuel and temperature, not where the fire was, so it learnt what each season looked like. Huot et al. split by random weeks, which puts the same seasons in training and testing and can hide this.</p>
+    <p><b>The test scored higher than cross-validation.</b> I wrote in advance that scores might drop on 2019–20, because it was more extreme than any training season. Every model scored higher instead. Most of that season's new burn was large, continuous forest fronts close to the existing fire, the easiest case for every model. The order of the models stayed the same.</p>
+
+    <h2 id="failures">Where it fails</h2>
+    <p><b>Long-range spread.</b> Fire that jumps far ahead of the front isn't predicted. Between 6 and 24 km from the burnt area, every model scores 0.06 F1 or less; beyond 24 km, 0.016 or less. That's 5.8% of the 2019–20 new burn, against 0.5% in the training seasons. Embers carried kilometres ahead, and fires that make their own weather, aren't in any of these models.</p>
+
+    <figure class="chart wide" aria-labelledby="bands-cap">
+      <div class="bands-chart" role="img" aria-label="F1 on the 2019–20 fires by distance from the burnt area. Within 6 km: main model 0.415, U-Net + physics 0.381, plain U-Net 0.346, simple rule 0.313, physics alone 0.109. From 6 to 24 km: 0.020, 0.052, 0.059, 0.000, 0.002. Beyond 24 km: 0.008, 0.016, 0.000, 0.000, 0.000.">
+        <!-- Values from docs/results/test_results.csv (F1 <=6 km, 6-24 km, >24 km); bar length = F1 on a shared 0 to 0.5 scale. -->
+        <span class="h"></span><span class="h">Within 6 km</span><span class="h">6 to 24 km</span><span class="h">Beyond 24 km</span>
+        <span class="name main">Main model</span><span class="cell main"><span class="bar" style="--v:0.415"></span><span class="val">0.415</span></span><span class="cell main"><span class="bar" style="--v:0.02"></span><span class="val">0.020</span></span><span class="cell main"><span class="bar" style="--v:0.008"></span><span class="val">0.008</span></span>
+        <span class="name">U-Net + physics</span><span class="cell"><span class="bar" style="--v:0.381"></span><span class="val">0.381</span></span><span class="cell"><span class="bar" style="--v:0.052"></span><span class="val">0.052</span></span><span class="cell"><span class="bar" style="--v:0.016"></span><span class="val">0.016</span></span>
+        <span class="name">Plain U-Net</span><span class="cell"><span class="bar" style="--v:0.346"></span><span class="val">0.346</span></span><span class="cell"><span class="bar" style="--v:0.059"></span><span class="val">0.059</span></span><span class="cell"><span class="bar" style="--v:0"></span><span class="val">0</span></span>
+        <span class="name">Simple rule</span><span class="cell"><span class="bar" style="--v:0.313"></span><span class="val">0.313</span></span><span class="cell"><span class="bar" style="--v:0"></span><span class="val">0</span></span><span class="cell"><span class="bar" style="--v:0"></span><span class="val">0</span></span>
+        <span class="name">Physics alone</span><span class="cell"><span class="bar" style="--v:0.109"></span><span class="val">0.109</span></span><span class="cell"><span class="bar" style="--v:0.002"></span><span class="val">0.002</span></span><span class="cell"><span class="bar" style="--v:0"></span><span class="val">0</span></span>
+      </div>
+      <figcaption id="bands-cap"><span class="cap">F1 on the 2019–20 fires, split by how far the new burn was from the area already burnt. Near the fire, every model has some skill. Further out, none of them does.</span></figcaption>
+    </figure>
+
+    <p><b>Grass fires.</b> Grass and crop fires score 0.13 to 0.14 F1 on the test season for every model, against 0.375 in forest for the main model. The training data has few grass fires, because the satellite burned-area maps miss much grass burning. Some grass fires from other seasons on the Compare page score close to zero.</p>
+    <p><b>The edge of the study area.</b> The weather and fuel data stop at a fixed box around Victoria. Three New South Wales test fires ran past it: Batemans Bay and two near Braidwood. Nothing within 6 km of the edge is scored, and those fires are left off the website.</p>
+    <p><b>Perfect forecasts.</b> The models use the next day's actual weather, as if the forecast were perfect. Real use would rely on forecasts and be less accurate.</p>
+
+    <h2 id="next">What's next</h2>
+    <ul>
+      <li>A What-if page: start a fire anywhere, choose the weather, and see what the physics and main models predict.</li>
+      <li>Add fuel moisture from Sentinel-2 satellite data.</li>
+      <li>Rerun the random forest with a random-week split, to measure how much that kind of split inflates scores.</li>
+    </ul>
+
+    <h2 id="references">Built on</h2>
+    <ul class="refs">
+      <li>Huot, F., Hu, R. L., Goyal, N., Sankar, T., Ihme, M. and Chen, Y.-F. (2022). Next Day Wildfire Spread: a machine learning dataset to predict wildfire spreading from remote-sensing data. <i>IEEE Transactions on Geoscience and Remote Sensing</i>, 60.</li>
+      <li>Parks, S. A. (2014). Mapping day-of-burning with coarse-resolution satellite fire-detection data. <i>International Journal of Wildland Fire</i>, 23(2), 215–223.</li>
+      <li>Cheney, N. P., Gould, J. S., McCaw, W. L. and Anderson, W. R. (2012). Predicting fire behaviour in dry eucalypt forest in southern Australia. <i>Forest Ecology and Management</i>, 280, 120–131. (Vesta, used for forest and woodland.)</li>
+      <li>Cheney, N. P., Gould, J. S. and Catchpole, W. R. (1998). Prediction of fire spread in grasslands. <i>International Journal of Wildland Fire</i>, 8(1), 1–13. (Used for grass and crop.)</li>
+      <li>Cruz, M. G., McCaw, W. L., Anderson, W. R. and Gould, J. S. (2013). Fire behaviour modelling in semi-arid mallee-heath shrublands of southern Australia. <i>Environmental Modelling &amp; Software</i>, 40, 21–34. (Used for shrub and heath.)</li>
+      <li>Cruz, M. G., Gould, J. S., Kidnie, S., Bessell, R., Nichols, D. and Slijepcevic, A. (2015). Effects of curing on grassfires: II. Effect of grass senescence on the rate of fire spread. <i>International Journal of Wildland Fire</i>, 24(6), 838–848. (Used for grass curing in the grass model.)</li>
+    </ul>
+    <p class="meta">Data credits and licences are on <a href="/about.html">About</a>.</p>
   </main>
+  </div>
   <script src="site.js"></script>
+  <script src="findings.js?v=1"></script>
 </body>
 </html>

@@ -1,0 +1,36 @@
+/* Home page: the claim and the result on the left, one predicted-vs-actual
+   day on the right; one screen on desktop, a short stack on phones. */
+.home { display: flex; flex-direction: column; min-height: 100vh; }
+.home main {
+  flex: 1; display: grid; grid-template-columns: minmax(300px, 5fr) 7fr; gap: 56px; align-items: center;
+  max-width: 1400px; width: 100%; margin: 0 auto; padding: 24px 32px 40px;
+}
+.home h1 { font: 400 clamp(32px, 3.3vw, 46px)/1.1 var(--serif); letter-spacing: -0.012em; margin: 0; max-width: 18ch; }
+.home .result { font: 400 19px/1.55 var(--serif); margin: 22px 0 0; max-width: 44ch; color: var(--ink); }
+.home .go { display: flex; flex-wrap: wrap; gap: 10px 32px; margin: 28px 0 0; }
+.home .go a {
+  font: 500 22px/1.2 var(--serif); color: var(--ink); text-decoration: none;
+  padding-bottom: 3px; border-bottom: 1px solid var(--amber);
+}
+.home .go a:hover { color: #fff; }
+.home .note {
+  margin: 30px 0 0; padding-left: 12px; border-left: 2px solid var(--amber); max-width: 42ch;
+  font: 400 14px/1.4 var(--sans); color: var(--ink-soft);
+}
+.home .shot { margin: 0; }
+.home .shot img { display: block; width: 100%; height: auto; border-radius: 2px; }
+.home figcaption { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 10px; font: 400 14px/1.4 var(--sans); color: var(--ink-soft); }
+.home figcaption .where { color: var(--ink); }
+.home .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+.home .sw.outline { box-shadow: inset 0 0 0 1.5px #f0f1ec; }
+.home .sw.guess { background: rgba(236, 178, 106, 0.8); }
+.home .sw.ash { background: rgba(146, 148, 150, 0.45); }
+
+@media (max-width: 900px) {
+  .home main { grid-template-columns: 1fr; gap: 28px; padding: 20px 20px 48px; align-items: start; }
+  .home h1 { font-size: 30px; max-width: none; }
+  .home .result { font-size: 17px; margin-top: 14px; }
+  .home .go { margin-top: 20px; gap: 10px 24px; }
+  .home .go a { font-size: 20px; }
+  .home .note { margin-top: 20px; }
+}

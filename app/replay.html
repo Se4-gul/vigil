@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vigil · Replay</title>
+  <meta name="description" content="Replay real bushfires of 2019–20 in Victoria day by day, from satellite data.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vigil">
+  <meta property="og:title" content="Vigil · Replay">
+  <meta property="og:description" content="Replay real bushfires of 2019–20 in Victoria day by day, from satellite data.">
+  <meta property="og:url" content="https://vigil-c5o.pages.dev/replay">
+  <meta property="og:image" content="https://vigil-c5o.pages.dev/img/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+  <link rel="stylesheet" href="site.css?v=5">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="replay">
+  <div id="map" aria-label="Map of the selected fire"></div>
+
+  <header class="top">
+    <a class="wordmark" href="/">Vigil</a>
+    <nav id="site-nav" aria-label="Pages"></nav>
+
+    <div class="fire">
+      <button id="fire-name" class="fire-name" aria-haspopup="listbox" aria-expanded="false">
+        <span id="fire-label">Loading fires</span><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+      <ul id="fire-list" class="fire-list" role="listbox" aria-label="Choose a fire" hidden></ul>
+      <p id="fire-range" class="fire-range"></p>
+    </div>
+  </header>
+
+  <section class="readout" aria-live="polite">
+    <p id="date" class="date">–</p>
+    <p id="stat" class="stat"></p>
+    <p class="key">
+      <span><i class="sw amber"></i>burning</span>
+      <span><i class="sw copper"></i>last few days</span>
+      <span><i class="sw ash"></i>burnt earlier</span>
+    </p>
+  </section>
+
+  <section class="timeline" aria-label="Playback">
+    <button id="play" class="play" aria-label="Play">
+      <svg class="icon-play" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>
+    </button>
+    <div class="track">
+      <canvas id="bars" aria-hidden="true"></canvas>
+      <input id="slider" type="range" min="0" max="1" step="0.01" value="0" aria-label="Day of the fire">
+    </div>
+  </section>
+
+  <p class="attribution">
+    Basemap <a href="https://openfreemap.org">OpenFreeMap</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>,
+    © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>.
+    Terrain <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a>.
+    Fire data from NASA and the Bureau of Meteorology; full credits on <a href="about.html">About</a>.
+  </p>
+
+  <script src="site.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+  <script src="basemap.js?v=9"></script>
+  <script src="app.js"></script>
+</body>
+</html>
